@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "382706650946",
+    "project_id": "belajarflutter-mobile",
+    "storage_bucket": "belajarflutter-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:382706650946:android:24a40bee9c32e90bd902db",
+        "android_client_info": {
+          "package_name": "com.example.belajarflutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfn4Erq8Rx1vvuyZGOOky4sE9juaMUDVc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
