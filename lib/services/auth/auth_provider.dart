@@ -8,6 +8,6 @@ abstract class AuthProvider {
     required String email,
     required String password,
   });
-  Future<AuthUser> logOut();
+  Future<void> logOut();
   Future<AuthUser> sendEmailVerification();
 }
