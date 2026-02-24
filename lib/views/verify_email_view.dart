@@ -1,5 +1,5 @@
 import 'package:belajarflutter/constans/routes.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:belajarflutter/services/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 
 class VerifyEmailView extends StatefulWidget {
@@ -24,14 +24,13 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
           ),
           TextButton(
             onPressed: () async {
-              final user = FirebaseAuth.instance.currentUser;
-              await user?.sendEmailVerification();
+              await AuthService.firebase().sendEmailVerification();
             },
             child: const Text('Send email verification'),
           ),
           TextButton(
             onPressed: () async {
-              await FirebaseAuth.instance.signOut();
+              await AuthService.firebase().logOut();
               Navigator.of(
                 context,
               ).pushNamedAndRemoveUntil(registerRoute, (route) => false);
