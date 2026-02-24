@@ -1,5 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
+
+# Workaround for third-party CMake scripts (e.g. Firebase C++ SDK) that still
+# declare a minimum version lower than 3.5, which is rejected by newer CMake.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
 project(belajarflutter LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
