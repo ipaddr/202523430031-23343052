@@ -1,4 +1,4 @@
-import 'package:belajarflutter/constans/routes.dart';
+import 'package:belajarflutter/constants/routes.dart';
 import 'package:belajarflutter/services/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 
