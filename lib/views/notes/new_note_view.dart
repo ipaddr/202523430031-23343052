@@ -1,7 +1,6 @@
 import 'package:belajarflutter/services/auth/auth_service.dart';
 import 'package:belajarflutter/services/crud/notes_service.dart';
 import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
 
 class NewNoteView extends StatefulWidget {
   const NewNoteView({super.key});
