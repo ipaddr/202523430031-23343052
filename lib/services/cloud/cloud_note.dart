@@ -16,6 +16,13 @@ class CloudNote {
 
   CloudNote.fromSnapshot(QueryDocumentSnapshot<Map<String, dynamic>> snapshot)
     : documentId = snapshot.id,
-      ownerUserId = snapshot.data()[ownerUserIdFieldName],
-      text = snapshot.data()[textFieldName] as String;
+      ownerUserId =
+            (snapshot.data()[ownerUserIdFieldName] ??
+                snapshot.data()['ownerUserIdFieldName'])
+                as String? ??
+        '',
+      text =
+            (snapshot.data()[textFieldName] ?? snapshot.data()['textFieldName'])
+                as String? ??
+        '';
 }
