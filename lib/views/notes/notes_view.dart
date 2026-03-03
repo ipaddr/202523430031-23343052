@@ -1,4 +1,4 @@
-import 'package:belajarflutter/constans/routes.dart';
+import 'package:belajarflutter/constants/routes.dart';
 import 'package:belajarflutter/enums/menu_action.dart';
 import 'package:belajarflutter/services/auth/auth_service.dart';
 import 'package:belajarflutter/services/crud/notes_service.dart';
@@ -15,7 +15,7 @@ class NotesView extends StatefulWidget {
 
 class _NotesViewState extends State<NotesView> {
   late final NotesService _notesService;
-  String get userEmail => AuthService.firebase().currentUser!.email!;
+  String get userEmail => AuthService.firebase().currentUser!.email;
 
   @override
   void initState() {
