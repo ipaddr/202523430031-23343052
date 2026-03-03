@@ -1,7 +1,7 @@
 import 'package:belajarflutter/constans/routes.dart';
 import 'package:belajarflutter/services/auth/auth_service.dart';
 import 'package:belajarflutter/views/login_view.dart';
-import 'package:belajarflutter/views/notes/new_note_view.dart';
+import 'package:belajarflutter/views/notes/create_update_note_view.dart';
 import 'package:belajarflutter/views/notes/notes_view.dart';
 import 'package:belajarflutter/views/register_view.dart';
 import 'package:belajarflutter/views/verify_email_view.dart';
@@ -26,7 +26,7 @@ void main() {
         registerRoute: (context) => const RegisterView(),
         notesRoute: (context) => const NotesView(),
         verifyEmailRoute: (context) => const VerifyEmailView(),
-        newNoteRoute: (context) => const NewNoteView(),
+        CreateOrUpdateNoteRoute: (context) => const CreateUpdateNoteView(),
       },
     ),
   );
