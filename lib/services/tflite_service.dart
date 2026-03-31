@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
-class ClassificationResult {
-  const ClassificationResult({required this.label, required this.confidence});
+class DetectionResult {
+  const DetectionResult({required this.label, required this.confidence});
 
   final String label;
   final double confidence;
@@ -28,7 +28,7 @@ class TfliteService {
     _outputShape = _interpreter!.getOutputTensor(0).shape;
   }
 
-  Future<ClassificationResult> classifyImage(String imagePath) async {
+  Future<DetectionResult> detectImage(String imagePath) async {
     if (_interpreter == null) {
       throw Exception('Interpreter belum dimuat.');
     }
@@ -70,7 +70,7 @@ class TfliteService {
         ? _labels[topIndex]
         : 'Kelas ke-${topIndex + 1}';
 
-    return ClassificationResult(
+    return DetectionResult(
       label: _cleanLabel(label),
       confidence: topConfidence,
     );

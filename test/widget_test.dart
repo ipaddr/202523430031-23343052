@@ -13,7 +13,7 @@ void main() {
   testWidgets('Rempahin home page renders', (WidgetTester tester) async {
     await tester.pumpWidget(const RempahinApp());
 
-    expect(find.text('Rempahin - Klasifikasi Rempah'), findsOneWidget);
-    expect(find.text('Hasil Klasifikasi'), findsOneWidget);
+    expect(find.text('Rempahin'), findsOneWidget);
+    expect(find.text('Hasil Deteksi Rempah'), findsOneWidget);
   });
 }

@@ -17,7 +17,7 @@ class _HomePageState extends State<HomePage> {
   final TfliteService _tfliteService = TfliteService();
 
   File? _selectedImage;
-  String _predictionLabel = 'Belum ada hasil. Yuk unggah foto rempah dulu.';
+  String _predictionLabel = 'Belum ada hasil deteksi.';
   double _confidence = 0;
   bool _isModelReady = false;
   bool _isLoading = false;
@@ -69,7 +69,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _pickAndClassify(ImageSource source) async {
+  Future<void> _pickAndDetect(ImageSource source) async {
     if (!_isModelReady || _isLoading) {
       return;
     }
@@ -91,7 +91,7 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final result = await _tfliteService.classifyImage(image.path);
+      final result = await _tfliteService.detectImage(image.path);
       if (!mounted) {
         return;
       }
@@ -105,7 +105,7 @@ class _HomePageState extends State<HomePage> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Maaf, foto belum bisa diklasifikasikan.\n$error'),
+          content: Text('Maaf, foto belum bisa dideteksi.\n$error'),
           backgroundColor: const Color(0xFFCB997E),
         ),
       );
@@ -182,7 +182,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'Unggah foto rempah untuk mulai klasifikasi',
+                        'Unggah foto rempah untuk mulai deteksi',
                         style: TextStyle(
                           color: text,
                           fontSize: 17,
@@ -254,7 +254,7 @@ class _HomePageState extends State<HomePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Hasil Klasifikasi Rempah',
+                              'Hasil Deteksi Rempah',
                               style: TextStyle(
                                 color: text,
                                 fontSize: 16,
@@ -313,7 +313,7 @@ class _HomePageState extends State<HomePage> {
                             child: ElevatedButton.icon(
                               onPressed: !_isModelReady || _isLoading
                                   ? null
-                                  : () => _pickAndClassify(ImageSource.camera),
+                                  : () => _pickAndDetect(ImageSource.camera),
                               icon: const Icon(Icons.camera_alt_rounded),
                               label: const Text('Buka Kamera'),
                               style: ElevatedButton.styleFrom(
@@ -331,7 +331,7 @@ class _HomePageState extends State<HomePage> {
                             child: ElevatedButton.icon(
                               onPressed: !_isModelReady || _isLoading
                                   ? null
-                                  : () => _pickAndClassify(ImageSource.gallery),
+                                  : () => _pickAndDetect(ImageSource.gallery),
                               icon: const Icon(Icons.photo_library_rounded),
                               label: const Text('Ambil dari Galeri'),
                               style: ElevatedButton.styleFrom(
