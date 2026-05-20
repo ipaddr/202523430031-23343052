@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "36322493034",
+    "project_id": "gamezone-45d28",
+    "storage_bucket": "gamezone-45d28.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:36322493034:android:b8bb4f64139b9160448013",
+        "android_client_info": {
+          "package_name": "com.gamezone.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "36322493034-8nul33q41oug1it2mfjlgvsddn907eu1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gamezone.app",
+            "certificate_hash": "5bfb1867f6fe855f05e238141acfa11bee207307"
+          }
+        },
+        {
+          "client_id": "36322493034-9i3qk5a752shmrv271ivheisnpa8qadj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAyzVIIKA40ruDrS9rIuy4e6CIVdBa2PEU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "36322493034-9i3qk5a752shmrv271ivheisnpa8qadj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "36322493034-7ou4jui2s4vdqbol9f2e9mshlm6vf4ar.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.gamezone"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
