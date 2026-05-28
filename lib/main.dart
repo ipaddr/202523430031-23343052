@@ -8,6 +8,7 @@ import 'package:gamezone/pages/start/login_page.dart';
 import 'package:gamezone/pages/user/user_dashboard.dart';
 import 'package:gamezone/pages/admin/admin_dashboard.dart';
 import 'package:gamezone/pages/superadmin/superadmin_dashboard.dart';
+import 'package:gamezone/pages/edit_profile_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
@@ -33,6 +34,7 @@ class MyApp extends StatelessWidget {
         '/user-dashboard': (context) => const UserDashboardPage(),
         '/admin-dashboard': (context) => const AdminDashboardPage(),
         '/superadmin-dashboard': (context) => const SuperAdminDashboardPage(),
+        '/edit-profile': (context) => const EditProfilePage(),
       },
     );
   }

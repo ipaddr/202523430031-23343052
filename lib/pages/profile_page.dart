@@ -42,34 +42,34 @@ class _ProfilePageState extends State<ProfilePage> {
           userData = snapshot.data!.data() as Map<String, dynamic>;
         }
 
-        final String name = userData['nama'] ?? firebaseUser.displayName ?? 'Pengguna GameZone';
+        final String name = userData['nama'] ?? '';
         final String email = userData['email'] ?? firebaseUser.email ?? '-';
         final String role = (userData['role'] ?? 'user').toString().toLowerCase();
-        final String phone = userData['noHp'] ?? '-';
-        final String status = userData['status'] ?? 'active';
+        final String phone = userData['noHp'] ?? '';
+        final String status = userData['status'] ?? 'aktif';
 
         // Konfigurasi Estetika Peran secara dinamis
         final Color themeColor;
         final String roleLabel;
         final IconData roleIcon;
         final String securityDesc;
-        final String avatarUrl = userData['fotoProfil'] ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150';
+        final String avatarUrl = userData['foto'] ?? '';
 
         if (role == 'superadmin' || role == 'super_admin') {
           themeColor = const Color(0xFF22D3EE); // Cyan
-          roleLabel = 'ROLE: SUPER ADMIN PLATFORM';
+          roleLabel = 'PERAN: SUPER ADMIN PLATFORM';
           roleIcon = Icons.shield_rounded;
-          securityDesc = 'Super Admin Account';
+          securityDesc = 'Akun Super Admin';
         } else if (role == 'admin') {
           themeColor = const Color(0xFFC084FC); // Purple
-          roleLabel = 'ROLE: PARTNER / ADMIN';
+          roleLabel = 'PERAN: MITRA / ADMIN';
           roleIcon = Icons.admin_panel_settings_rounded;
-          securityDesc = 'Admin Partner Account';
+          securityDesc = 'Akun Admin Mitra';
         } else {
           themeColor = const Color(0xFF10B981); // Emerald Green
-          roleLabel = 'ROLE: USER PLATFORM';
+          roleLabel = 'PERAN: PENGGUNA PLATFORM';
           roleIcon = Icons.person_rounded;
-          securityDesc = 'Standard User Account';
+          securityDesc = 'Akun Pengguna Standar';
         }
 
         return Center(
@@ -96,11 +96,19 @@ class _ProfilePageState extends State<ProfilePage> {
                               spreadRadius: 2,
                             ),
                           ],
-                          image: DecorationImage(
-                            image: NetworkImage(avatarUrl),
-                            fit: BoxFit.cover,
-                          ),
+                          color: const Color(0xFF11172A),
                         ),
+                        child: avatarUrl.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(50),
+                                child: Image.network(
+                                  avatarUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Icon(Icons.person, color: themeColor, size: 50),
+                                ),
+                              )
+                            : Icon(Icons.person, color: themeColor, size: 50),
                       ),
                       Positioned(
                         bottom: 0,
@@ -120,7 +128,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 18),
                 Center(
                   child: Text(
-                    name,
+                    name.isEmpty ? 'Belum Diatur' : name,
                     style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -148,7 +156,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       const SizedBox(height: 14),
                       _buildProfileRow(themeColor, Icons.mail_outline_rounded, 'Email', email),
                       const Divider(color: Color(0xFF1E293B), height: 24),
-                      _buildProfileRow(themeColor, Icons.phone_android_rounded, 'Nomor HP', phone),
+                      _buildProfileRow(themeColor, Icons.phone_android_rounded, 'Nomor HP', phone.isEmpty ? 'Belum Diatur' : phone),
                       const Divider(color: Color(0xFF1E293B), height: 24),
                       _buildProfileRow(themeColor, Icons.security_rounded, 'Keamanan', securityDesc),
                       const Divider(color: Color(0xFF1E293B), height: 24),
@@ -156,8 +164,29 @@ class _ProfilePageState extends State<ProfilePage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 36),
+                const SizedBox(height: 30),
                 
+                // Tombol Edit Profil
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/edit-profile');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: themeColor.withValues(alpha: 0.15),
+                    foregroundColor: themeColor,
+                    shadowColor: Colors.transparent,
+                    side: BorderSide(color: themeColor, width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  icon: const Icon(Icons.edit_rounded, size: 18),
+                  label: const Text(
+                    'Edit Profil',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
                 // Tombol Keluar
                 ElevatedButton.icon(
                   onPressed: () => _logout(context),

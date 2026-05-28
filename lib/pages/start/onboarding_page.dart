@@ -52,7 +52,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         curve: Curves.easeOut,
       );
     } else {
-      Navigator.of(context).pushReplacementNamed('/login');
+      Navigator.of(context).pushReplacementNamed('/superadmin-dashboard');
     }
   }
 
@@ -105,7 +105,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       Text(
                         _slides[_current]['subtitle'] as String,
                         textAlign: TextAlign.center,
-                        style: AppTextStyle.body2.copyWith(color: const Color(0xFF9AA0C6)),
+                        style: AppTextStyle.body2.copyWith(
+                          color: const Color(0xFF9AA0C6),
+                        ),
                       ),
                       const SizedBox(height: 30),
                       // chip: jarak tetap dari subtitle
