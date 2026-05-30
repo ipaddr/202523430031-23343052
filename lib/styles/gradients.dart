@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// Gradient yang dipakai berulang untuk elemen branding.
 class Gradients {
   static const Gradient accent = LinearGradient(
     colors: [Color(0xFF14B8FF), Color(0xFF7C4DFF)],

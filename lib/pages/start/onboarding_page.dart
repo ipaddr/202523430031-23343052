@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/background.dart';
-import '../../widgets/onboarding_card.dart';
-import '../../widgets/slide_indicator.dart';
+import '../../widgets/startup_widgets.dart';
 import '../../styles/app_textstyle.dart';
 
 class OnboardingPage extends StatefulWidget {
@@ -52,7 +51,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         curve: Curves.easeOut,
       );
     } else {
-      Navigator.of(context).pushReplacementNamed('/superadmin-dashboard');
+      Navigator.of(context).pushReplacementNamed('/login');
     }
   }
 

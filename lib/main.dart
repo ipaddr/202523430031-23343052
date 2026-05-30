@@ -11,6 +11,7 @@ import 'package:gamezone/pages/superadmin/superadmin_dashboard.dart';
 import 'package:gamezone/pages/edit_profile_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+// Titik masuk aplikasi dan peta route utama GameZone.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -22,6 +23,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // MaterialApp memegang tema, halaman awal, dan semua route.
     return MaterialApp(
       title: 'GameZone',
       debugShowCheckedModeBanner: false,

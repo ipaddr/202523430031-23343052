@@ -9,6 +9,7 @@ import '../../styles/gradients.dart';
 import '../../widgets/background.dart';
 import '../../widgets/auth_widgets.dart';
 
+// Halaman masuk untuk semua jenis akun di aplikasi GameZone.
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -33,6 +34,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
+    // Login utama membaca role user lalu mengarahkan ke dashboard yang sesuai.
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -68,14 +70,16 @@ class _LoginPageState extends State<LoginPage> {
           if (role == 'admin' && status == 'pending') {
             await FirebaseAuth.instance.signOut();
             setState(() {
-              _errorMessage = 'Akun Admin Anda masih dalam proses verifikasi oleh Super Admin. Harap tunggu.';
+              _errorMessage =
+                  'Akun Admin Anda masih dalam proses verifikasi oleh Super Admin. Harap tunggu.';
               _isLoading = false;
             });
             return;
           } else if (role == 'admin' && status == 'rejected') {
             await FirebaseAuth.instance.signOut();
             setState(() {
-              _errorMessage = 'Pendaftaran Admin Anda ditolak oleh Super Admin.';
+              _errorMessage =
+                  'Pendaftaran Admin Anda ditolak oleh Super Admin.';
               _isLoading = false;
             });
             return;
@@ -118,6 +122,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   String _mapFirebaseError(String code) {
+    // Ubah kode error Firebase menjadi pesan yang lebih mudah dibaca.
     switch (code) {
       case 'invalid-email':
         return 'Format email tidak valid.';
@@ -135,6 +140,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _forgotPassword() async {
+    // Reset password dikirim ke email yang sedang diisi.
     final email = _emailController.text.trim();
     if (email.isEmpty) {
       setState(() {
@@ -164,6 +170,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _loginWithGoogle() async {
+    // Login Google tetap menjaga aturan akun email-password yang sudah ada.
     if (_isLoading) {
       return;
     }
@@ -191,25 +198,30 @@ class _LoginPageState extends State<LoginPage> {
       List<String> signInMethods = [];
       try {
         // ignore: deprecated_member_use
-        signInMethods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
+        signInMethods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(
+          email,
+        );
       } catch (e) {
         debugPrint('Gagal memeriksa metode sign in: $e');
       }
 
       if (signInMethods.isNotEmpty) {
-        if (signInMethods.contains('password') && !signInMethods.contains('google.com')) {
+        if (signInMethods.contains('password') &&
+            !signInMethods.contains('google.com')) {
           // Pengguna terdaftar dengan Email & Password tetapi belum menghubungkan akun Google.
           // Kita cegah login Google agar password mereka tidak dihapus secara otomatis oleh Firebase.
           await googleSignIn.signOut();
           setState(() {
-            _errorMessage = 'Akun ($email) terdaftar menggunakan Email & Password. Silakan masuk menggunakan Email & Password Anda.';
+            _errorMessage =
+                'Akun ($email) terdaftar menggunakan Email & Password. Silakan masuk menggunakan Email & Password Anda.';
             _isLoading = false;
           });
           return;
         }
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final OAuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -217,7 +229,9 @@ class _LoginPageState extends State<LoginPage> {
 
       // Login ke Firebase Auth terlebih dahulu agar pengguna terautentikasi.
       // Hal ini diperlukan agar kita memiliki hak akses (read permission) ke Firestore.
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
       final user = userCredential.user;
 
       if (user == null) {
@@ -240,13 +254,16 @@ class _LoginPageState extends State<LoginPage> {
           try {
             await user.delete();
           } catch (deleteError) {
-            debugPrint('Gagal membersihkan user Auth setelah cek registrasi: $deleteError');
+            debugPrint(
+              'Gagal membersihkan user Auth setelah cek registrasi: $deleteError',
+            );
           }
         }
         await FirebaseAuth.instance.signOut();
         await googleSignIn.signOut();
         setState(() {
-          _errorMessage = 'Akun Google Anda (${user.email}) belum terdaftar. Silakan daftar terlebih dahulu.';
+          _errorMessage =
+              'Akun Google Anda (${user.email}) belum terdaftar. Silakan daftar terlebih dahulu.';
           _isLoading = false;
         });
         return;
@@ -261,7 +278,8 @@ class _LoginPageState extends State<LoginPage> {
         await FirebaseAuth.instance.signOut();
         await googleSignIn.signOut();
         setState(() {
-          _errorMessage = 'Akun Admin Anda masih dalam proses verifikasi oleh Super Admin. Harap tunggu.';
+          _errorMessage =
+              'Akun Admin Anda masih dalam proses verifikasi oleh Super Admin. Harap tunggu.';
           _isLoading = false;
         });
         return;
@@ -299,7 +317,8 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
       setState(() {
-        _errorMessage = 'Gagal melakukan login dengan Google. Silakan coba lagi.';
+        _errorMessage =
+            'Gagal melakukan login dengan Google. Silakan coba lagi.';
       });
     } finally {
       if (mounted) {

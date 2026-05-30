@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
+// Definisi gaya teks standar agar tipografi konsisten.
 class AppTextStyle {
   // Gaya Heading
   static const TextStyle h1 = TextStyle(

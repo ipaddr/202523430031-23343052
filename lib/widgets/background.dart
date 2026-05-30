@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// Background utama yang dipakai di banyak halaman autentikasi dan dashboard.
 class GameZoneBackground extends StatelessWidget {
   final Widget child;
 

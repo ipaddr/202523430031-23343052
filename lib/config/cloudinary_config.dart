@@ -1,7 +1,7 @@
 class CloudinaryConfig {
-  // Masukkan Cloud Name Anda dari Cloudinary Dashboard
+  // Identitas cloud untuk endpoint upload media.
   static const String cloudName = 'dy8jteyo5';
 
-  // Masukkan nama Unsigned Upload Preset Anda dari Cloudinary Settings -> Upload
+  // Preset unsigned upload yang dipakai saat kirim file.
   static const String uploadPreset = 'upload_gamezone';
 }

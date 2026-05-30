@@ -10,6 +10,7 @@ import '../styles/app_colors.dart';
 import '../styles/app_textstyle.dart';
 import '../widgets/background.dart';
 
+// Halaman untuk mengubah profil pengguna yang sedang login.
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
 
@@ -41,10 +42,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _loadUserData() async {
+    // Muat data profil awal dari dokumen user aktif.
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
         if (doc.exists) {
           final data = doc.data() as Map<String, dynamic>;
           setState(() {
@@ -79,23 +84,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<String> _uploadFile(XFile file) async {
-    if (CloudinaryConfig.cloudName == 'YOUR_CLOUD_NAME' || CloudinaryConfig.uploadPreset == 'YOUR_UPLOAD_PRESET') {
-      throw Exception('Cloudinary belum dikonfigurasi di lib/config/cloudinary_config.dart');
+    // Upload foto profil dilakukan melalui Cloudinary.
+    if (CloudinaryConfig.cloudName == 'YOUR_CLOUD_NAME' ||
+        CloudinaryConfig.uploadPreset == 'YOUR_UPLOAD_PRESET') {
+      throw Exception(
+        'Cloudinary belum dikonfigurasi di lib/config/cloudinary_config.dart',
+      );
     }
 
     try {
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/${CloudinaryConfig.cloudName}/auto/upload');
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/${CloudinaryConfig.cloudName}/auto/upload',
+      );
       final request = http.MultipartRequest('POST', url);
 
       final bytes = await file.readAsBytes();
       final fileName = file.name;
 
       request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: fileName,
-        ),
+        http.MultipartFile.fromBytes('file', bytes, filename: fileName),
       );
 
       request.fields['upload_preset'] = CloudinaryConfig.uploadPreset;
@@ -108,8 +115,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
         return responseData['secure_url'] as String;
       } else {
         final errorBody = jsonDecode(response.body);
-        final String errorMsg = errorBody['error']?['message'] ?? 'Gagal mengunggah file ke Cloudinary.';
-        throw Exception('Cloudinary: $errorMsg (Status ${response.statusCode})');
+        final String errorMsg =
+            errorBody['error']?['message'] ??
+            'Gagal mengunggah file ke Cloudinary.';
+        throw Exception(
+          'Cloudinary: $errorMsg (Status ${response.statusCode})',
+        );
       }
     } catch (e) {
       throw Exception('Gagal mengunggah berkas ke Cloudinary: ${e.toString()}');
@@ -117,6 +128,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _pickAndUploadImage(ImageSource source) async {
+    // Pilih gambar lalu unggah langsung agar field foto terbarui cepat.
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
@@ -159,7 +171,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal mengunggah foto: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(
+              'Gagal mengunggah foto: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
             backgroundColor: AppColors.errorRed,
           ),
         );
@@ -174,6 +188,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   void _showPickerOptions(BuildContext context) {
+    // Bottom sheet ini memberi pilihan galeri atau kamera.
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0F172A),
@@ -185,16 +200,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: Wrap(
             children: [
               ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: AppColors.accentCyan),
-                title: const Text('Pilih dari Galeri', style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.photo_library_rounded,
+                  color: AppColors.accentCyan,
+                ),
+                title: const Text(
+                  'Pilih dari Galeri',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _pickAndUploadImage(ImageSource.gallery);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: AppColors.accentCyan),
-                title: const Text('Ambil dari Kamera', style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.camera_alt_rounded,
+                  color: AppColors.accentCyan,
+                ),
+                title: const Text(
+                  'Ambil dari Kamera',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _pickAndUploadImage(ImageSource.camera);
@@ -208,6 +235,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _saveProfile() async {
+    // Simpan perubahan profil ke Firestore setelah validasi selesai.
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -266,7 +294,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
                     const SizedBox(width: 8),
@@ -281,11 +312,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ],
                 ),
               ),
-              
+
               Expanded(
                 child: _isFetching
                     ? const Center(
-                        child: CircularProgressIndicator(color: AppColors.accentCyan),
+                        child: CircularProgressIndicator(
+                          color: AppColors.accentCyan,
+                        ),
                       )
                     : Center(
                         child: ConstrainedBox(
@@ -301,7 +334,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     child: Column(
                                       children: [
                                         GestureDetector(
-                                          onTap: _isLoading ? null : () => _showPickerOptions(context),
+                                          onTap: _isLoading
+                                              ? null
+                                              : () =>
+                                                    _showPickerOptions(context),
                                           child: Stack(
                                             children: [
                                               Container(
@@ -309,37 +345,74 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                                 height: 100,
                                                 decoration: BoxDecoration(
                                                   shape: BoxShape.circle,
-                                                  border: Border.all(color: AppColors.accentCyan, width: 2),
-                                                  color: const Color(0xFF141B31),
+                                                  border: Border.all(
+                                                    color: AppColors.accentCyan,
+                                                    width: 2,
+                                                  ),
+                                                  color: const Color(
+                                                    0xFF141B31,
+                                                  ),
                                                   boxShadow: [
                                                     BoxShadow(
-                                                      color: AppColors.accentCyan.withValues(alpha: 0.15),
+                                                      color: AppColors
+                                                          .accentCyan
+                                                          .withValues(
+                                                            alpha: 0.15,
+                                                          ),
                                                       blurRadius: 14,
                                                       spreadRadius: 2,
                                                     ),
                                                   ],
                                                 ),
-                                                child: _fotoProfilController.text.trim().isNotEmpty
+                                                child:
+                                                    _fotoProfilController.text
+                                                        .trim()
+                                                        .isNotEmpty
                                                     ? ClipRRect(
-                                                        borderRadius: BorderRadius.circular(50),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              50,
+                                                            ),
                                                         child: Image.network(
-                                                          _fotoProfilController.text.trim(),
+                                                          _fotoProfilController
+                                                              .text
+                                                              .trim(),
                                                           fit: BoxFit.cover,
-                                                          errorBuilder: (context, error, stackTrace) =>
-                                                              const Icon(Icons.person, color: Color(0xFF64748B), size: 44),
+                                                          errorBuilder:
+                                                              (
+                                                                context,
+                                                                error,
+                                                                stackTrace,
+                                                              ) => const Icon(
+                                                                Icons.person,
+                                                                color: Color(
+                                                                  0xFF64748B,
+                                                                ),
+                                                                size: 44,
+                                                              ),
                                                         ),
                                                       )
-                                                    : const Icon(Icons.person, color: Color(0xFF64748B), size: 44),
+                                                    : const Icon(
+                                                        Icons.person,
+                                                        color: Color(
+                                                          0xFF64748B,
+                                                        ),
+                                                        size: 44,
+                                                      ),
                                               ),
                                               Positioned(
                                                 bottom: 0,
                                                 right: 0,
                                                 child: Container(
-                                                  padding: const EdgeInsets.all(6),
-                                                  decoration: const BoxDecoration(
-                                                    color: AppColors.accentCyan,
-                                                    shape: BoxShape.circle,
+                                                  padding: const EdgeInsets.all(
+                                                    6,
                                                   ),
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                        color: AppColors
+                                                            .accentCyan,
+                                                        shape: BoxShape.circle,
+                                                      ),
                                                   child: const Icon(
                                                     Icons.camera_alt_rounded,
                                                     color: Colors.black,
@@ -352,8 +425,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                         ),
                                         const SizedBox(height: 16),
                                         TextButton.icon(
-                                          onPressed: _isLoading ? null : () => _showPickerOptions(context),
-                                          icon: const Icon(Icons.camera_alt_outlined, color: AppColors.accentCyan, size: 18),
+                                          onPressed: _isLoading
+                                              ? null
+                                              : () =>
+                                                    _showPickerOptions(context),
+                                          icon: const Icon(
+                                            Icons.camera_alt_outlined,
+                                            color: AppColors.accentCyan,
+                                            size: 18,
+                                          ),
                                           label: const Text(
                                             'Ubah Foto Profil',
                                             style: TextStyle(
@@ -363,10 +443,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                             ),
                                           ),
                                           style: TextButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                            backgroundColor: AppColors.accentCyan.withValues(alpha: 0.1),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 8,
+                                            ),
+                                            backgroundColor: AppColors
+                                                .accentCyan
+                                                .withValues(alpha: 0.1),
                                             shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(20),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
                                             ),
                                           ),
                                         ),
@@ -374,7 +460,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     ),
                                   ),
                                   const SizedBox(height: 32),
-                                  
+
                                   // Field Nama
                                   const Text(
                                     'NAMA LENGKAP',
@@ -389,35 +475,57 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   TextFormField(
                                     controller: _namaController,
                                     validator: (value) {
-                                      if (value == null || value.trim().isEmpty) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
                                         return 'Nama tidak boleh kosong';
                                       }
                                       return null;
                                     },
-                                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
                                     decoration: InputDecoration(
                                       hintText: 'Masukkan nama lengkap',
-                                      hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
-                                      prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF94A3B8), size: 20),
+                                      hintStyle: const TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 14,
+                                      ),
+                                      prefixIcon: const Icon(
+                                        Icons.person_outline_rounded,
+                                        color: Color(0xFF94A3B8),
+                                        size: 20,
+                                      ),
                                       filled: true,
                                       fillColor: const Color(0xFF141B31),
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 16,
+                                          ),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(16),
-                                        borderSide: const BorderSide(color: Color(0xFF24304A)),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF24304A),
+                                        ),
                                       ),
                                       enabledBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(16),
-                                        borderSide: const BorderSide(color: Color(0xFF24304A)),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF24304A),
+                                        ),
                                       ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(16),
-                                        borderSide: const BorderSide(color: AppColors.accentCyan, width: 1.6),
+                                        borderSide: const BorderSide(
+                                          color: AppColors.accentCyan,
+                                          width: 1.6,
+                                        ),
                                       ),
                                     ),
                                   ),
                                   const SizedBox(height: 20),
-                                  
+
                                   // Field No HP
                                   const Text(
                                     'NOMOR HP',
@@ -433,48 +541,74 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     controller: _noHpController,
                                     keyboardType: TextInputType.phone,
                                     validator: (value) {
-                                      if (value == null || value.trim().isEmpty) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
                                         return 'Nomor HP tidak boleh kosong';
                                       }
                                       return null;
                                     },
-                                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
                                     decoration: InputDecoration(
                                       hintText: 'Masukkan nomor HP aktif',
-                                      hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
-                                      prefixIcon: const Icon(Icons.phone_android_rounded, color: Color(0xFF94A3B8), size: 20),
+                                      hintStyle: const TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 14,
+                                      ),
+                                      prefixIcon: const Icon(
+                                        Icons.phone_android_rounded,
+                                        color: Color(0xFF94A3B8),
+                                        size: 20,
+                                      ),
                                       filled: true,
                                       fillColor: const Color(0xFF141B31),
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 16,
+                                          ),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(16),
-                                        borderSide: const BorderSide(color: Color(0xFF24304A)),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF24304A),
+                                        ),
                                       ),
                                       enabledBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(16),
-                                        borderSide: const BorderSide(color: Color(0xFF24304A)),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF24304A),
+                                        ),
                                       ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(16),
-                                        borderSide: const BorderSide(color: AppColors.accentCyan, width: 1.6),
+                                        borderSide: const BorderSide(
+                                          color: AppColors.accentCyan,
+                                          width: 1.6,
+                                        ),
                                       ),
                                     ),
                                   ),
                                   const SizedBox(height: 20),
-                                  
+
                                   const SizedBox(height: 16),
-                                  
+
                                   // Tombol Simpan
                                   SizedBox(
                                     width: double.infinity,
                                     height: 52,
                                     child: ElevatedButton(
-                                      onPressed: _isLoading ? null : _saveProfile,
+                                      onPressed: _isLoading
+                                          ? null
+                                          : _saveProfile,
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppColors.accentCyan,
                                         foregroundColor: Colors.black,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
                                         ),
                                       ),
                                       child: _isLoading
@@ -483,7 +617,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                               height: 20,
                                               child: CircularProgressIndicator(
                                                 strokeWidth: 2.5,
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(Colors.black),
                                               ),
                                             )
                                           : const Text(

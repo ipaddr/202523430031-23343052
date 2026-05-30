@@ -15,13 +15,18 @@ class _UsersPageState extends State<UsersPage> {
   String _userSearchQuery = '';
   int _activeTab = 0; // 0 = Semua Users, 1 = Pengguna, 2 = Game Station
 
-
-  // Konfirmasi & Hapus Pengguna dari Firestore
+  // Aksi hapus untuk data user di Firestore.
   Future<void> _deleteUser(String userId, String name) async {
-    final bool confirm = await _showConfirmDeleteDialog('Hapus Pengguna', 'Apakah Anda yakin ingin menghapus pengguna "$name" secara permanen dari sistem?');
+    final bool confirm = await _showConfirmDeleteDialog(
+      'Hapus Pengguna',
+      'Apakah Anda yakin ingin menghapus pengguna "$name" secara permanen dari sistem?',
+    );
     if (confirm) {
       try {
-        await FirebaseFirestore.instance.collection('users').doc(userId).delete();
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .delete();
         _showSuccessSnackBar('Pengguna berhasil dihapus secara permanen!');
       } catch (e) {
         _showErrorSnackBar('Gagal menghapus pengguna: $e');
@@ -29,12 +34,18 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  // Konfirmasi & Hapus Game Station dari Firestore
+  // Aksi hapus untuk data game station di Firestore.
   Future<void> _deleteStation(String stationId, String name) async {
-    final bool confirm = await _showConfirmDeleteDialog('Hapus Game Station', 'Apakah Anda yakin ingin menghapus stasiun game "$name" secara permanen dari sistem?');
+    final bool confirm = await _showConfirmDeleteDialog(
+      'Hapus Game Station',
+      'Apakah Anda yakin ingin menghapus stasiun game "$name" secara permanen dari sistem?',
+    );
     if (confirm) {
       try {
-        await FirebaseFirestore.instance.collection('stations').doc(stationId).delete();
+        await FirebaseFirestore.instance
+            .collection('stations')
+            .doc(stationId)
+            .delete();
         _showSuccessSnackBar('Game Station berhasil dihapus secara permanen!');
       } catch (e) {
         _showErrorSnackBar('Gagal menghapus stasiun game: $e');
@@ -42,7 +53,7 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  // Dialog konfirmasi penghapusan data
+  // Dialog konfirmasi sebelum data benar-benar dihapus.
   Future<bool> _showConfirmDeleteDialog(String title, String content) async {
     final bool? result = await showDialog<bool>(
       context: context,
@@ -55,21 +66,35 @@ class _UsersPageState extends State<UsersPage> {
               borderRadius: BorderRadius.circular(20),
               side: const BorderSide(color: Color(0xFF1E293B)),
             ),
-            title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            title: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             content: Text(content),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
+                child: const Text(
+                  'Batal',
+                  style: TextStyle(color: Color(0xFF64748B)),
+                ),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEF4444),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-                child: const Text('Hapus', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Hapus',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -97,6 +122,7 @@ class _UsersPageState extends State<UsersPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Halaman ini menggabungkan pencarian, filter tab, dan daftar hasil.
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 430),
@@ -114,57 +140,96 @@ class _UsersPageState extends State<UsersPage> {
                 style: const TextStyle(color: Colors.white, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Cari nama atau lokasi station...',
-                  hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
-                  prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
-                  fillColor: const Color(0xFF1E293B).withOpacity(0.3),
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 13,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    color: Color(0xFF64748B),
+                  ),
+                  fillColor: const Color(0xFF1E293B).withValues(alpha: 0.3),
                   filled: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: const Color(0xFF334155).withOpacity(0.3)),
+                    borderSide: BorderSide(
+                      color: const Color(0xFF334155).withValues(alpha: 0.3),
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: const Color(0xFF334155).withOpacity(0.3)),
+                    borderSide: BorderSide(
+                      color: const Color(0xFF334155).withValues(alpha: 0.3),
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFF22D3EE), width: 1.2),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF22D3EE),
+                      width: 1.2,
+                    ),
                   ),
                 ),
               ),
             ),
 
-            // Stream Data Utama dari Firestore
+            // Stream utama untuk user dan station agar daftar selalu terbaru.
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').snapshots(),
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .snapshots(),
                 builder: (context, usersSnapshot) {
                   return StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('stations').snapshots(),
+                    stream: FirebaseFirestore.instance
+                        .collection('stations')
+                        .snapshots(),
                     builder: (context, stationsSnapshot) {
                       final int totalUsers = usersSnapshot.hasData
-                          ? usersSnapshot.data!.docs.where((doc) => doc.get('role') == 'user').length
+                          ? usersSnapshot.data!.docs
+                                .where((doc) => doc.get('role') == 'user')
+                                .length
                           : 0;
                       final int totalStations = stationsSnapshot.hasData
-                          ? stationsSnapshot.data!.docs.where((doc) => doc.get('statusVerifikasi') == 'verified').length
+                          ? stationsSnapshot.data!.docs
+                                .where(
+                                  (doc) =>
+                                      doc.get('statusVerifikasi') == 'verified',
+                                )
+                                .length
                           : 0;
 
                       return Column(
                         children: [
                           // Tab Navigasi Kapsul
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 8,
+                            ),
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               physics: const BouncingScrollPhysics(),
                               child: Row(
                                 children: [
-                                  _buildTabCapsule(0, 'Semua Users', isActive: _activeTab == 0),
+                                  _buildTabCapsule(
+                                    0,
+                                    'Semua Users',
+                                    isActive: _activeTab == 0,
+                                  ),
                                   const SizedBox(width: 8),
-                                  _buildTabCapsule(1, 'Pengguna ($totalUsers)', isActive: _activeTab == 1),
+                                  _buildTabCapsule(
+                                    1,
+                                    'Pengguna ($totalUsers)',
+                                    isActive: _activeTab == 1,
+                                  ),
                                   const SizedBox(width: 8),
-                                  _buildTabCapsule(2, 'Game Station ($totalStations)', isActive: _activeTab == 2),
+                                  _buildTabCapsule(
+                                    2,
+                                    'Game Station ($totalStations)',
+                                    isActive: _activeTab == 2,
+                                  ),
                                 ],
                               ),
                             ),
@@ -172,7 +237,10 @@ class _UsersPageState extends State<UsersPage> {
 
                           // Konten List Pengguna & Game Station
                           Expanded(
-                            child: _buildListContent(usersSnapshot, stationsSnapshot),
+                            child: _buildListContent(
+                              usersSnapshot,
+                              stationsSnapshot,
+                            ),
                           ),
                         ],
                       );
@@ -188,12 +256,15 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Widget _buildTabCapsule(int index, String title, {required bool isActive}) {
+    // Tab kapsul dipakai untuk berpindah antara semua data, user, dan station.
     return GestureDetector(
       onTap: () => setState(() => _activeTab = index),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? Colors.transparent : const Color(0xFF131722).withOpacity(0.5),
+          color: isActive
+              ? Colors.transparent
+              : const Color(0xFF131722).withValues(alpha: 0.5),
           gradient: isActive
               ? const LinearGradient(
                   colors: [Color(0xFF22D3EE), Color(0xFFC084FC)],
@@ -202,7 +273,11 @@ class _UsersPageState extends State<UsersPage> {
                 )
               : null,
           borderRadius: BorderRadius.circular(24),
-          border: isActive ? null : Border.all(color: const Color(0xFF334155).withOpacity(0.3)),
+          border: isActive
+              ? null
+              : Border.all(
+                  color: const Color(0xFF334155).withValues(alpha: 0.3),
+                ),
         ),
         child: Text(
           title,
@@ -220,9 +295,12 @@ class _UsersPageState extends State<UsersPage> {
     AsyncSnapshot<QuerySnapshot> usersSnapshot,
     AsyncSnapshot<QuerySnapshot> stationsSnapshot,
   ) {
+    // Gabungkan hasil query user dan station lalu urutkan sesuai tab aktif.
     if (usersSnapshot.connectionState == ConnectionState.waiting ||
         stationsSnapshot.connectionState == ConnectionState.waiting) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF22D3EE)));
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF22D3EE)),
+      );
     }
 
     final List<Map<String, dynamic>> items = [];
@@ -236,12 +314,9 @@ class _UsersPageState extends State<UsersPage> {
           if (role == 'user') {
             final String name = data['nama'] ?? 'Tanpa Nama';
             final String email = data['email'] ?? '';
-            if (name.toLowerCase().contains(_userSearchQuery) || email.toLowerCase().contains(_userSearchQuery)) {
-              items.add({
-                'type': 'user',
-                'id': doc.id,
-                'data': data,
-              });
+            if (name.toLowerCase().contains(_userSearchQuery) ||
+                email.toLowerCase().contains(_userSearchQuery)) {
+              items.add({'type': 'user', 'id': doc.id, 'data': data});
             }
           }
         }
@@ -257,12 +332,9 @@ class _UsersPageState extends State<UsersPage> {
           if (statusVerifikasi == 'verified') {
             final String name = data['namaStation'] ?? 'Nama Tidak Diketahui';
             final String address = data['alamat'] ?? '';
-            if (name.toLowerCase().contains(_userSearchQuery) || address.toLowerCase().contains(_userSearchQuery)) {
-              items.add({
-                'type': 'station',
-                'id': doc.id,
-                'data': data,
-              });
+            if (name.toLowerCase().contains(_userSearchQuery) ||
+                address.toLowerCase().contains(_userSearchQuery)) {
+              items.add({'type': 'station', 'id': doc.id, 'data': data});
             }
           }
         }
@@ -295,13 +367,18 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // Membangun Card untuk Game Station terverifikasi
+  // Kartu ringkas untuk game station yang sudah diverifikasi.
   Widget _buildStationCard(String stationId, Map<String, dynamic> data) {
     final String name = data['namaStation'] ?? 'Nama Tidak Diketahui';
     final int rooms = data['jumlahRooms'] ?? 0;
-    final String photo = (data['foto'] != null && (data['foto'] as List).isNotEmpty) ? data['foto'][0] : '';
-    final bool isAktif = (data['isAktif'] ?? (data['statusVerifikasi'] == 'verified'));
-    final String phone = data['noHpOwner'] ?? data['noHp'] ?? data['telepon'] ?? '-';
+    final String photo =
+        (data['foto'] != null && (data['foto'] as List).isNotEmpty)
+        ? data['foto'][0]
+        : '';
+    final bool isAktif =
+        (data['isAktif'] ?? (data['statusVerifikasi'] == 'verified'));
+    final String phone =
+        data['noHpOwner'] ?? data['noHp'] ?? data['telepon'] ?? '-';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -319,7 +396,12 @@ class _UsersPageState extends State<UsersPage> {
         children: [
           Row(
             children: [
-              CustomImageLoader(photoStr: photo, width: 44, height: 44, radius: 10),
+              CustomImageLoader(
+                photoStr: photo,
+                width: 44,
+                height: 44,
+                radius: 10,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -327,7 +409,11 @@ class _UsersPageState extends State<UsersPage> {
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -341,7 +427,9 @@ class _UsersPageState extends State<UsersPage> {
                             width: 6,
                             height: 6,
                             decoration: BoxDecoration(
-                              color: isAktif ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                              color: isAktif
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFF64748B),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -349,19 +437,47 @@ class _UsersPageState extends State<UsersPage> {
                           Text(
                             isAktif ? 'Aktif' : 'Nonaktif',
                             style: TextStyle(
-                              color: isAktif ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                              color: isAktif
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFF64748B),
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text('•', style: TextStyle(color: Color(0xFF475569), fontSize: 11)),
+                          const Text(
+                            '•',
+                            style: TextStyle(
+                              color: Color(0xFF475569),
+                              fontSize: 11,
+                            ),
+                          ),
                           const SizedBox(width: 8),
-                          Text('$rooms Room', style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, fontWeight: FontWeight.w500)),
+                          Text(
+                            '$rooms Room',
+                            style: const TextStyle(
+                              color: Color(0xFFCBD5E1),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                           const SizedBox(width: 8),
-                          const Text('•', style: TextStyle(color: Color(0xFF475569), fontSize: 11)),
+                          const Text(
+                            '•',
+                            style: TextStyle(
+                              color: Color(0xFF475569),
+                              fontSize: 11,
+                            ),
+                          ),
                           const SizedBox(width: 8),
-                          Text(phone, style: const TextStyle(color: Color(0xFF22D3EE), fontSize: 11, fontWeight: FontWeight.w500)),
+                          Text(
+                            phone,
+                            style: const TextStyle(
+                              color: Color(0xFF22D3EE),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -392,12 +508,21 @@ class _UsersPageState extends State<UsersPage> {
                   child: Container(
                     height: 38,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B).withOpacity(0.4),
+                      color: const Color(0xFF1E293B).withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF334155).withOpacity(0.4)),
+                      border: Border.all(
+                        color: const Color(0xFF334155).withValues(alpha: 0.4),
+                      ),
                     ),
                     child: const Center(
-                      child: Text('Lihat Detail', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        'Lihat Detail',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -433,7 +558,7 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // Membangun Card untuk Pengguna (User)
+  // Kartu ringkas untuk data pengguna standar.
   Widget _buildUserCard(String userId, Map<String, dynamic> data) {
     final String name = data['nama'] ?? 'Tanpa Nama';
     final String email = data['email'] ?? '';
@@ -458,7 +583,13 @@ class _UsersPageState extends State<UsersPage> {
         children: [
           Row(
             children: [
-              CustomImageLoader(photoStr: data['foto'], width: 44, height: 44, radius: 22, fallbackIcon: Icons.person_rounded),
+              CustomImageLoader(
+                photoStr: data['foto'],
+                width: 44,
+                height: 44,
+                radius: 22,
+                fallbackIcon: Icons.person_rounded,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -466,14 +597,21 @@ class _UsersPageState extends State<UsersPage> {
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       email,
-                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 12,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -484,28 +622,61 @@ class _UsersPageState extends State<UsersPage> {
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: isBanned ? const Color(0xFF2E1620) : const Color(0xFF162E25),
+                              color: isBanned
+                                  ? const Color(0xFF2E1620)
+                                  : const Color(0xFF162E25),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               isBanned ? 'BANNED' : 'AKTIF',
                               style: TextStyle(
-                                color: isBanned ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                color: isBanned
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFF10B981),
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text('•', style: TextStyle(color: Color(0xFF475569), fontSize: 11)),
+                          const Text(
+                            '•',
+                            style: TextStyle(
+                              color: Color(0xFF475569),
+                              fontSize: 11,
+                            ),
+                          ),
                           const SizedBox(width: 8),
-                          Text(phone, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, fontWeight: FontWeight.w500)),
+                          Text(
+                            phone,
+                            style: const TextStyle(
+                              color: Color(0xFFCBD5E1),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                           const SizedBox(width: 8),
-                          const Text('•', style: TextStyle(color: Color(0xFF475569), fontSize: 11)),
+                          const Text(
+                            '•',
+                            style: TextStyle(
+                              color: Color(0xFF475569),
+                              fontSize: 11,
+                            ),
+                          ),
                           const SizedBox(width: 8),
-                          Text(role, style: const TextStyle(color: Color(0xFF22D3EE), fontSize: 11, fontWeight: FontWeight.w500)),
+                          Text(
+                            role,
+                            style: const TextStyle(
+                              color: Color(0xFF22D3EE),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -536,12 +707,21 @@ class _UsersPageState extends State<UsersPage> {
                   child: Container(
                     height: 38,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B).withOpacity(0.4),
+                      color: const Color(0xFF1E293B).withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF334155).withOpacity(0.4)),
+                      border: Border.all(
+                        color: const Color(0xFF334155).withValues(alpha: 0.4),
+                      ),
                     ),
                     child: const Center(
-                      child: Text('Lihat Detail', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        'Lihat Detail',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -591,7 +771,7 @@ class _UsersPageState extends State<UsersPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF22D3EE).withOpacity(0.1),
+                color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: const Color(0xFF22D3EE), size: 40),
@@ -599,13 +779,21 @@ class _UsersPageState extends State<UsersPage> {
             const SizedBox(height: 18),
             Text(
               title,
-              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, height: 1.45),
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                height: 1.45,
+              ),
             ),
           ],
         ),

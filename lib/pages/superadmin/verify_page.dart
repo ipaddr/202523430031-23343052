@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'verify_detail_page.dart';
 
+// Halaman daftar verifikasi untuk meninjau pengajuan game station.
 class VerifyPage extends StatefulWidget {
   const VerifyPage({super.key});
 
@@ -13,22 +14,25 @@ class VerifyPage extends StatefulWidget {
 class _VerifyPageState extends State<VerifyPage> {
   int _selectedTab = 0;
 
-  // Setujui Game Station
-  Future<void> _approveStation(BuildContext context, String stationId, String ownerId, String name) async {
+  // Setujui game station dan update status terkait di Firestore.
+  Future<void> _approveStation(
+    BuildContext context,
+    String stationId,
+    String ownerId,
+    String name,
+  ) async {
     try {
       final db = FirebaseFirestore.instance;
       final batch = db.batch();
-      
+
       batch.update(db.collection('stations').doc(stationId), {
         'statusVerifikasi': 'verified',
       });
-      
-      batch.update(db.collection('users').doc(ownerId), {
-        'status': 'active',
-      });
-      
+
+      batch.update(db.collection('users').doc(ownerId), {'status': 'active'});
+
       await batch.commit();
-      
+
       if (!context.mounted) {
         return;
       }
@@ -62,13 +66,18 @@ class _VerifyPageState extends State<VerifyPage> {
     }
   }
 
-  // Tolak Game Station
-  Future<void> _rejectStation(BuildContext context, String stationId, String name) async {
+  // Tolak game station dan simpan status akhir ke Firestore.
+  Future<void> _rejectStation(
+    BuildContext context,
+    String stationId,
+    String name,
+  ) async {
     try {
-      await FirebaseFirestore.instance.collection('stations').doc(stationId).update({
-        'statusVerifikasi': 'rejected',
-      });
-      
+      await FirebaseFirestore.instance
+          .collection('stations')
+          .doc(stationId)
+          .update({'statusVerifikasi': 'rejected'});
+
       if (!context.mounted) {
         return;
       }
@@ -104,15 +113,14 @@ class _VerifyPageState extends State<VerifyPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Layout utama terdiri dari tab status dan daftar pengajuan.
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 430),
         child: Column(
           children: [
             _buildTabBar(),
-            Expanded(
-              child: _buildList(),
-            ),
+            Expanded(child: _buildList()),
           ],
         ),
       ),
@@ -120,12 +128,16 @@ class _VerifyPageState extends State<VerifyPage> {
   }
 
   Widget _buildTabBar() {
+    // Tab bar memisahkan pengajuan menunggu dan riwayat selesai.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
           StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('stations').where('statusVerifikasi', isEqualTo: 'pending').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('stations')
+                .where('statusVerifikasi', isEqualTo: 'pending')
+                .snapshots(),
             builder: (context, snapshot) {
               int count = snapshot.hasData ? snapshot.data!.docs.length : 0;
               return _buildTabButton(
@@ -135,16 +147,14 @@ class _VerifyPageState extends State<VerifyPage> {
             },
           ),
           const SizedBox(width: 12),
-          _buildTabButton(
-            title: 'Selesai',
-            index: 1,
-          ),
+          _buildTabButton(title: 'Selesai', index: 1),
         ],
       ),
     );
   }
 
   Widget _buildTabButton({required String title, required int index}) {
+    // Tombol tab kecil untuk mengganti daftar yang sedang ditampilkan.
     final bool isActive = _selectedTab == index;
     return GestureDetector(
       onTap: () {
@@ -164,9 +174,7 @@ class _VerifyPageState extends State<VerifyPage> {
                 )
               : null,
           borderRadius: BorderRadius.circular(24),
-          border: isActive
-              ? null
-              : Border.all(color: const Color(0xFF1E293B)),
+          border: isActive ? null : Border.all(color: const Color(0xFF1E293B)),
         ),
         child: Text(
           title,
@@ -181,11 +189,15 @@ class _VerifyPageState extends State<VerifyPage> {
   }
 
   Widget _buildList() {
+    // Query berubah sesuai tab aktif agar daftar tetap fokus.
     Query query = FirebaseFirestore.instance.collection('stations');
     if (_selectedTab == 0) {
       query = query.where('statusVerifikasi', isEqualTo: 'pending');
     } else {
-      query = query.where('statusVerifikasi', whereIn: ['verified', 'rejected']);
+      query = query.where(
+        'statusVerifikasi',
+        whereIn: ['verified', 'rejected'],
+      );
     }
 
     return StreamBuilder<QuerySnapshot>(
@@ -200,9 +212,11 @@ class _VerifyPageState extends State<VerifyPage> {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return _buildEmptyState(
             icon: Icons.fact_check_outlined,
-            title: _selectedTab == 0 ? 'Tidak Ada Pengajuan' : 'Belum Ada Riwayat',
-            subtitle: _selectedTab == 0 
-                ? 'Semua pengajuan pendaftaran mitra game station saat ini telah diverifikasi.' 
+            title: _selectedTab == 0
+                ? 'Tidak Ada Pengajuan'
+                : 'Belum Ada Riwayat',
+            subtitle: _selectedTab == 0
+                ? 'Semua pengajuan pendaftaran mitra game station saat ini telah diverifikasi.'
                 : 'Belum ada pendaftaran yang selesai diverifikasi.',
           );
         }
@@ -224,7 +238,12 @@ class _VerifyPageState extends State<VerifyPage> {
     );
   }
 
-  Widget _buildStationCard(Map<String, dynamic> data, String stationId, String ownerId) {
+  Widget _buildStationCard(
+    Map<String, dynamic> data,
+    String stationId,
+    String ownerId,
+  ) {
+    // Kartu pengajuan menampilkan ringkasan lalu memberi aksi verifikasi.
     final String stationName = data['namaStation'] ?? 'Nama Tidak Diketahui';
     final String ownerName = data['namaOwner'] ?? 'Owner';
     final List<dynamic> photos = data['foto'] ?? [];
@@ -240,7 +259,11 @@ class _VerifyPageState extends State<VerifyPage> {
       statusColor = const Color(0xFFEF4444);
     }
 
-    Widget imageWidget = const Icon(Icons.storefront_rounded, color: Color(0xFF64748B), size: 28);
+    Widget imageWidget = const Icon(
+      Icons.storefront_rounded,
+      color: Color(0xFF64748B),
+      size: 28,
+    );
     if (photos.isNotEmpty) {
       final String photoStr = photos[0];
       if (photoStr.startsWith('data:image')) {
@@ -257,10 +280,7 @@ class _VerifyPageState extends State<VerifyPage> {
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFF1E293B),
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0xFF1E293B), width: 1),
       ),
       child: Column(
         children: [
@@ -304,7 +324,10 @@ class _VerifyPageState extends State<VerifyPage> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF141B31),
                   borderRadius: BorderRadius.circular(8),
@@ -320,15 +343,20 @@ class _VerifyPageState extends State<VerifyPage> {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           if (status == 'pending') ...[
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _approveStation(context, stationId, ownerId, stationName),
+                    onPressed: () => _approveStation(
+                      context,
+                      stationId,
+                      ownerId,
+                      stationName,
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00FF9D),
                       foregroundColor: Colors.black,
@@ -338,13 +366,17 @@ class _VerifyPageState extends State<VerifyPage> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       elevation: 0,
                     ),
-                    child: const Text('Terima', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Terima',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _rejectStation(context, stationId, stationName),
+                    onPressed: () =>
+                        _rejectStation(context, stationId, stationName),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2D1622),
                       foregroundColor: const Color(0xFFEF4444),
@@ -355,14 +387,17 @@ class _VerifyPageState extends State<VerifyPage> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       elevation: 0,
                     ),
-                    child: const Text('Tolak', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Tolak',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
           ],
-          
+
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
@@ -409,6 +444,7 @@ class _VerifyPageState extends State<VerifyPage> {
     required String title,
     required String subtitle,
   }) {
+    // Empty state muncul saat tidak ada data untuk tab aktif.
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -426,13 +462,21 @@ class _VerifyPageState extends State<VerifyPage> {
             const SizedBox(height: 18),
             Text(
               title,
-              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, height: 1.45),
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                height: 1.45,
+              ),
             ),
           ],
         ),

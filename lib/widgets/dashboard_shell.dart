@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'background.dart';
 
+// Kerangka dashboard umum dengan background, header, dan navigasi tab.
 class DashboardShell extends StatelessWidget {
   final IconData icon;
   final Color iconColor;

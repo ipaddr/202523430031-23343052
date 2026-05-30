@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_textstyle.dart';
 
+// Theme aplikasi berisi token ukuran, warna, dan komponen Material.
 class AppTheme {
   // Konstanta Tema - Premium Gaming
   static const double radiusSmall = 8;

@@ -37,14 +37,20 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return widget.isUser ? _buildUserDetailPageContent() : _buildStationDetailPageContent();
+    // Detail page memilih tampilan user atau station berdasarkan flag input.
+    return widget.isUser
+        ? _buildUserDetailPageContent()
+        : _buildStationDetailPageContent();
   }
 
   Widget _buildUserDetailPageContent() {
+    // Bagian ini menampilkan detail profil pengguna.
     final String name = widget.data['nama'] ?? 'Tanpa Nama';
     final String email = widget.data['email'] ?? '-';
     final String phone = widget.data['noHp'] ?? '-';
-    final String role = (widget.data['role'] ?? 'user').toString().toUpperCase();
+    final String role = (widget.data['role'] ?? 'user')
+        .toString()
+        .toUpperCase();
     final String status = widget.data['status'] ?? 'active';
     final bool isBanned = status == 'banned';
     final String photo = widget.data['foto'] ?? '';
@@ -56,7 +62,11 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
         color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(24),
       ),
-      child: const Icon(Icons.person_rounded, color: Color(0xFF64748B), size: 64),
+      child: const Icon(
+        Icons.person_rounded,
+        color: Color(0xFF64748B),
+        size: 64,
+      ),
     );
 
     if (photo.isNotEmpty) {
@@ -88,7 +98,10 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
                   child: Row(
                     children: [
                       GestureDetector(
@@ -96,18 +109,32 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B).withOpacity(0.4),
+                            color: const Color(
+                              0xFF1E293B,
+                            ).withValues(alpha: 0.4),
                             shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF334155).withOpacity(0.5)),
+                            border: Border.all(
+                              color: const Color(
+                                0xFF334155,
+                              ).withValues(alpha: 0.5),
+                            ),
                           ),
-                          child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 20),
+                          child: const Icon(
+                            Icons.chevron_left_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
                       ),
                       const Expanded(
                         child: Text(
                           'Detail Pengguna',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 42),
@@ -127,9 +154,15 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B).withOpacity(0.3),
+                            color: const Color(
+                              0xFF1E293B,
+                            ).withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: const Color(0xFF334155).withOpacity(0.3)),
+                            border: Border.all(
+                              color: const Color(
+                                0xFF334155,
+                              ).withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,19 +173,30 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                                   Expanded(
                                     child: Text(
                                       name,
-                                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: isBanned ? const Color(0xFF2E1620) : const Color(0xFF162E25),
+                                      color: isBanned
+                                          ? const Color(0xFF2E1620)
+                                          : const Color(0xFF162E25),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
                                       isBanned ? 'BANNED' : 'AKTIF',
                                       style: TextStyle(
-                                        color: isBanned ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                        color: isBanned
+                                            ? const Color(0xFFEF4444)
+                                            : const Color(0xFF10B981),
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
                                         letterSpacing: 0.5,
@@ -164,25 +208,43 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                               const SizedBox(height: 20),
                               _buildDetailField('EMAIL PENGGUNA', email),
                               const SizedBox(height: 16),
-                              _buildDetailField('NOMOR HP / TELEPON', phone, isCyan: true),
+                              _buildDetailField(
+                                'NOMOR HP / TELEPON',
+                                phone,
+                                isCyan: true,
+                              ),
                               const SizedBox(height: 16),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
                                     'HAK AKSES / ROLE',
-                                    style: TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                                    style: TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.0,
+                                    ),
                                   ),
                                   const SizedBox(height: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF22D3EE).withOpacity(0.1),
+                                      color: const Color(
+                                        0xFF22D3EE,
+                                      ).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
                                       role,
-                                      style: const TextStyle(color: Color(0xFF22D3EE), fontSize: 11, fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        color: Color(0xFF22D3EE),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -204,22 +266,36 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
   }
 
   Widget _buildStationDetailPageContent() {
+    // Bagian ini menampilkan detail game station beserta dokumennya.
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('stations').doc(widget.stationId).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('stations')
+            .doc(widget.stationId)
+            .snapshots(),
         builder: (context, snapshot) {
           Map<String, dynamic> stationData = widget.data;
-          if (snapshot.hasData && snapshot.data != null && snapshot.data!.exists) {
+          if (snapshot.hasData &&
+              snapshot.data != null &&
+              snapshot.data!.exists) {
             stationData = snapshot.data!.data() as Map<String, dynamic>;
           }
 
-          final bool isAktif = (stationData['isAktif'] ?? (stationData['statusVerifikasi'] == 'verified'));
+          final bool isAktif =
+              (stationData['isAktif'] ??
+              (stationData['statusVerifikasi'] == 'verified'));
           final List<dynamic> photos = stationData['foto'] ?? widget.photos;
-          final List<dynamic> documents = stationData['buktiLegalitas'] ?? widget.documents;
-          final String stationName = stationData['namaStation'] ?? 'Nama Tidak Diketahui';
+          final List<dynamic> documents =
+              stationData['buktiLegalitas'] ?? widget.documents;
+          final String stationName =
+              stationData['namaStation'] ?? 'Nama Tidak Diketahui';
           final String address = stationData['alamat'] ?? '-';
-          final String phone = stationData['noHpOwner'] ?? stationData['noHp'] ?? stationData['telepon'] ?? '-';
+          final String phone =
+              stationData['noHpOwner'] ??
+              stationData['noHp'] ??
+              stationData['telepon'] ??
+              '-';
           final String jenis = stationData['jenis'] ?? '-';
           final int jumlahRooms = stationData['jumlahRooms'] ?? 0;
 
@@ -230,7 +306,11 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
               color: const Color(0xFF1E293B),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(Icons.storefront_rounded, color: Color(0xFF64748B), size: 48),
+            child: const Icon(
+              Icons.storefront_rounded,
+              color: Color(0xFF64748B),
+              size: 48,
+            ),
           );
 
           if (photos.isNotEmpty) {
@@ -240,7 +320,8 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                   height: 220,
                   child: PageView.builder(
                     controller: _pageController,
-                    onPageChanged: (index) => setState(() => _currentImageIndex = index),
+                    onPageChanged: (index) =>
+                        setState(() => _currentImageIndex = index),
                     itemCount: photos.length,
                     itemBuilder: (context, index) {
                       return GestureDetector(
@@ -270,7 +351,9 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                           width: _currentImageIndex == index ? 16 : 6,
                           height: 6,
                           decoration: BoxDecoration(
-                            color: _currentImageIndex == index ? const Color(0xFF22D3EE) : Colors.white24,
+                            color: _currentImageIndex == index
+                                ? const Color(0xFF22D3EE)
+                                : Colors.white24,
                             borderRadius: BorderRadius.circular(3),
                           ),
                         ),
@@ -280,12 +363,20 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                   Positioned(
                     left: 8,
                     top: 98,
-                    child: Icon(Icons.chevron_left_rounded, color: Colors.white.withOpacity(0.7), size: 24),
+                    child: Icon(
+                      Icons.chevron_left_rounded,
+                      color: Colors.white.withValues(alpha: 0.7),
+                      size: 24,
+                    ),
                   ),
                   Positioned(
                     right: 8,
                     top: 98,
-                    child: Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.7), size: 24),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white.withValues(alpha: 0.7),
+                      size: 24,
+                    ),
                   ),
                 ],
               ],
@@ -293,8 +384,10 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
           }
 
           String statusText = isAktif ? 'AKTIF' : 'NONAKTIF';
-          Color statusTextColor = isAktif ? const Color(0xFF10B981) : const Color(0xFF64748B);
-          Color statusBgColor = statusTextColor.withOpacity(0.1);
+          Color statusTextColor = isAktif
+              ? const Color(0xFF10B981)
+              : const Color(0xFF64748B);
+          Color statusBgColor = statusTextColor.withValues(alpha: 0.1);
 
           return Stack(
             children: [
@@ -311,7 +404,10 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
                       child: Row(
                         children: [
                           GestureDetector(
@@ -319,18 +415,32 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                             child: Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1E293B).withOpacity(0.4),
+                                color: const Color(
+                                  0xFF1E293B,
+                                ).withValues(alpha: 0.4),
                                 shape: BoxShape.circle,
-                                border: Border.all(color: const Color(0xFF334155).withOpacity(0.5)),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFF334155,
+                                  ).withValues(alpha: 0.5),
+                                ),
                               ),
-                              child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 20),
+                              child: const Icon(
+                                Icons.chevron_left_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                             ),
                           ),
                           const Expanded(
                             child: Text(
                               'Detail Game Station',
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 42),
@@ -350,28 +460,44 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                             Container(
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1E293B).withOpacity(0.3),
+                                color: const Color(
+                                  0xFF1E293B,
+                                ).withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: const Color(0xFF334155).withOpacity(0.3)),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFF334155,
+                                  ).withValues(alpha: 0.3),
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Expanded(
                                         child: Text(
                                           stationName,
-                                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: statusBgColor,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: Text(
                                           statusText,
@@ -388,38 +514,70 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      const Icon(Icons.location_on_rounded, color: Color(0xFF22D3EE), size: 14),
+                                      const Icon(
+                                        Icons.location_on_rounded,
+                                        color: Color(0xFF22D3EE),
+                                        size: 14,
+                                      ),
                                       const SizedBox(width: 6),
                                       Expanded(
                                         child: Text(
-                                          address.split(',').take(2).join(',').trim(),
-                                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                          address
+                                              .split(',')
+                                              .take(2)
+                                              .join(',')
+                                              .trim(),
+                                          style: const TextStyle(
+                                            color: Color(0xFF94A3B8),
+                                            fontSize: 12,
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 20),
-                                  _buildDetailField('JENIS GAME STATION', jenis),
+                                  _buildDetailField(
+                                    'JENIS GAME STATION',
+                                    jenis,
+                                  ),
                                   const SizedBox(height: 16),
-                                  _buildDetailField('KAPASITAS', '$jumlahRooms Unit PC / Rooms'),
+                                  _buildDetailField(
+                                    'KAPASITAS',
+                                    '$jumlahRooms Unit PC / Rooms',
+                                  ),
                                   const SizedBox(height: 16),
                                   _buildDetailField('ALAMAT LENGKAP', address),
                                   const SizedBox(height: 16),
-                                  _buildDetailField('NOMOR TELEPON BISNIS', phone, isCyan: true),
+                                  _buildDetailField(
+                                    'NOMOR TELEPON BISNIS',
+                                    phone,
+                                    isCyan: true,
+                                  ),
                                 ],
                               ),
                             ),
                             const SizedBox(height: 20),
 
                             FutureBuilder<DocumentSnapshot>(
-                              future: FirebaseFirestore.instance.collection('users').doc(widget.ownerId).get(),
+                              future: FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(widget.ownerId)
+                                  .get(),
                               builder: (context, userSnapshot) {
-                                String ownerName = stationData['namaOwner'] ?? 'Mitra Game Zone';
-                                String ownerEmail = stationData['emailOwner'] ?? 'mitra@gamezone.com';
+                                String ownerName =
+                                    stationData['namaOwner'] ??
+                                    'Mitra Game Zone';
+                                String ownerEmail =
+                                    stationData['emailOwner'] ??
+                                    'mitra@gamezone.com';
                                 String? ownerPhoto;
 
-                                if (userSnapshot.hasData && userSnapshot.data != null && userSnapshot.data!.exists) {
-                                  final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+                                if (userSnapshot.hasData &&
+                                    userSnapshot.data != null &&
+                                    userSnapshot.data!.exists) {
+                                  final userData =
+                                      userSnapshot.data!.data()
+                                          as Map<String, dynamic>;
                                   ownerName = userData['nama'] ?? ownerName;
                                   ownerEmail = userData['email'] ?? ownerEmail;
                                   ownerPhoto = userData['foto'];
@@ -428,20 +586,36 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                                 return Container(
                                   padding: const EdgeInsets.all(20),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF1E293B).withOpacity(0.3),
+                                    color: const Color(
+                                      0xFF1E293B,
+                                    ).withValues(alpha: 0.3),
                                     borderRadius: BorderRadius.circular(24),
-                                    border: Border.all(color: const Color(0xFF334155).withOpacity(0.3)),
+                                    border: Border.all(
+                                      color: const Color(
+                                        0xFF334155,
+                                      ).withValues(alpha: 0.3),
+                                    ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
-                                          Icon(Icons.supervised_user_circle_rounded, color: const Color(0xFFC084FC), size: 20),
+                                          Icon(
+                                            Icons
+                                                .supervised_user_circle_rounded,
+                                            color: const Color(0xFFC084FC),
+                                            size: 20,
+                                          ),
                                           SizedBox(width: 8),
                                           const Text(
                                             'Data Admin & Dokumen',
-                                            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -458,16 +632,24 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
                                                   ownerName,
-                                                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                                 const SizedBox(height: 2),
                                                 Text(
                                                   ownerEmail,
-                                                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                                                  style: const TextStyle(
+                                                    color: Color(0xFF64748B),
+                                                    fontSize: 12,
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -487,37 +669,95 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                                       const SizedBox(height: 10),
                                       if (documents.isNotEmpty)
                                         Column(
-                                          children: List.generate(documents.length, (index) {
-                                            final docUrl = documents[index] as String;
-                                            final bool isPdf = docUrl.toLowerCase().contains('.pdf') || docUrl.contains('/raw/upload/');
+                                          children: List.generate(documents.length, (
+                                            index,
+                                          ) {
+                                            final docUrl =
+                                                documents[index] as String;
+                                            final bool isPdf =
+                                                docUrl.toLowerCase().contains(
+                                                  '.pdf',
+                                                ) ||
+                                                docUrl.contains('/raw/upload/');
 
                                             return GestureDetector(
-                                              onTap: () => openExternalUrl(context, docUrl),
+                                              onTap: () => openExternalUrl(
+                                                context,
+                                                docUrl,
+                                              ),
                                               child: isPdf
                                                   ? Container(
-                                                      margin: const EdgeInsets.only(bottom: 8),
-                                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                      margin:
+                                                          const EdgeInsets.only(
+                                                            bottom: 8,
+                                                          ),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 14,
+                                                            vertical: 12,
+                                                          ),
                                                       decoration: BoxDecoration(
-                                                        color: const Color(0xFF1E293B).withOpacity(0.5),
-                                                        borderRadius: BorderRadius.circular(12),
-                                                        border: Border.all(color: const Color(0xFF334155)),
+                                                        color:
+                                                            const Color(
+                                                              0xFF1E293B,
+                                                            ).withValues(
+                                                              alpha: 0.5,
+                                                            ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              12,
+                                                            ),
+                                                        border: Border.all(
+                                                          color: const Color(
+                                                            0xFF334155,
+                                                          ),
+                                                        ),
                                                       ),
                                                       child: Row(
                                                         children: [
-                                                          const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFEF4444), size: 24),
-                                                          const SizedBox(width: 12),
+                                                          const Icon(
+                                                            Icons
+                                                                .picture_as_pdf_rounded,
+                                                            color: Color(
+                                                              0xFFEF4444,
+                                                            ),
+                                                            size: 24,
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 12,
+                                                          ),
                                                           const Expanded(
                                                             child: Text(
                                                               'Dokumen Izin Usaha (PDF)',
-                                                              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                                              style: TextStyle(
+                                                                color: Colors
+                                                                    .white,
+                                                                fontSize: 13,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
                                                             ),
                                                           ),
-                                                          Icon(Icons.open_in_new_rounded, color: const Color(0xFF22D3EE).withOpacity(0.8), size: 18),
+                                                          Icon(
+                                                            Icons
+                                                                .open_in_new_rounded,
+                                                            color:
+                                                                const Color(
+                                                                  0xFF22D3EE,
+                                                                ).withValues(
+                                                                  alpha: 0.8,
+                                                                ),
+                                                            size: 18,
+                                                          ),
                                                         ],
                                                       ),
                                                     )
                                                   : Padding(
-                                                      padding: const EdgeInsets.only(bottom: 10),
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            bottom: 10,
+                                                          ),
                                                       child: CustomImageLoader(
                                                         photoStr: docUrl,
                                                         width: double.infinity,
@@ -534,13 +774,21 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                                           height: 140,
                                           color: const Color(0xFF141B31),
                                           child: const Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
                                             children: [
-                                              Icon(Icons.badge_rounded, color: Color(0xFF475569), size: 36),
+                                              Icon(
+                                                Icons.badge_rounded,
+                                                color: Color(0xFF475569),
+                                                size: 36,
+                                              ),
                                               SizedBox(height: 8),
                                               Text(
                                                 'Tidak ada dokumen terlampir.',
-                                                style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                                                style: TextStyle(
+                                                  color: Color(0xFF64748B),
+                                                  fontSize: 11,
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -566,12 +814,18 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
   }
 
   Widget _buildDetailField(String label, String value, {bool isCyan = false}) {
+    // Field detail dipakai ulang untuk label dan nilai informasi.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+          style: const TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
@@ -579,7 +833,11 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
           style: TextStyle(
             color: isCyan ? const Color(0xFF22D3EE) : Colors.white,
             fontSize: isCyan ? 14 : 13,
-            fontWeight: isCyan ? FontWeight.bold : const Color(0xFF22D3EE) != Colors.white ? FontWeight.w600 : FontWeight.normal,
+            fontWeight: isCyan
+                ? FontWeight.bold
+                : const Color(0xFF22D3EE) != Colors.white
+                ? FontWeight.w600
+                : FontWeight.normal,
             height: isCyan ? 1.0 : 1.45,
           ),
         ),

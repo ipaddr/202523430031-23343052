@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// Palet warna utama yang dipakai ulang di seluruh aplikasi.
 class AppColors {
   // Warna Utama Gelap
   static const Color primaryDarkNavy = Color(0xFF0F172A);

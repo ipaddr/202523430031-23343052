@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 
 import '../../widgets/dashboard_shell.dart';
 
+// Dashboard sederhana untuk admin station.
 class AdminDashboardPage extends StatelessWidget {
   const AdminDashboardPage({super.key});
 
   Future<void> _logout(BuildContext context) async {
+    // Logout lalu kembali ke halaman login.
     await FirebaseAuth.instance.signOut();
     if (!context.mounted) {
       return;
@@ -16,6 +18,7 @@ class AdminDashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Shell dashboard dipakai ulang agar tampilan konsisten.
     final user = FirebaseAuth.instance.currentUser;
 
     return DashboardShell(

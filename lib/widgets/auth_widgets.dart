@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../styles/gradients.dart';
 
+// Komponen autentikasi yang dipakai ulang di login dan register.
 class AuthRoleSwitch extends StatelessWidget {
   final bool isAdminMode;
   final ValueChanged<bool> onChanged;

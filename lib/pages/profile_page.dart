@@ -6,6 +6,7 @@ import '../styles/app_colors.dart';
 import '../styles/app_textstyle.dart';
 import '../widgets/background.dart';
 
+// Halaman profil untuk melihat data akun aktif dan melakukan logout.
 class ProfilePage extends StatefulWidget {
   final bool isNestedTab;
   const ProfilePage({super.key, this.isNestedTab = false});
@@ -16,6 +17,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   Future<void> _logout(BuildContext context) async {
+    // Logout lalu bersihkan stack navigasi.
     await FirebaseAuth.instance.signOut();
     if (!context.mounted) {
       return;
@@ -25,16 +27,27 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Konten profil dibangun dari data user aktif di Firestore.
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser == null) {
-      return const Center(child: Text('Tidak ada pengguna masuk.', style: TextStyle(color: Colors.white)));
+      return const Center(
+        child: Text(
+          'Tidak ada pengguna masuk.',
+          style: TextStyle(color: Colors.white),
+        ),
+      );
     }
 
     final Widget content = StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(firebaseUser.uid).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFF22D3EE)));
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF22D3EE)),
+          );
         }
 
         Map<String, dynamic> userData = {};
@@ -44,11 +57,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
         final String name = userData['nama'] ?? '';
         final String email = userData['email'] ?? firebaseUser.email ?? '-';
-        final String role = (userData['role'] ?? 'user').toString().toLowerCase();
+        final String role = (userData['role'] ?? 'user')
+            .toString()
+            .toLowerCase();
         final String phone = userData['noHp'] ?? '';
         final String status = userData['status'] ?? 'aktif';
 
-        // Konfigurasi Estetika Peran secara dinamis
+        // Warna dan label berubah sesuai role user.
         final Color themeColor;
         final String roleLabel;
         final IconData roleIcon;
@@ -105,7 +120,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                   avatarUrl,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) =>
-                                      Icon(Icons.person, color: themeColor, size: 50),
+                                      Icon(
+                                        Icons.person,
+                                        color: themeColor,
+                                        size: 50,
+                                      ),
                                 ),
                               )
                             : Icon(Icons.person, color: themeColor, size: 50),
@@ -119,7 +138,11 @@ class _ProfilePageState extends State<ProfilePage> {
                             color: themeColor,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(roleIcon, color: const Color(0xFF0F172A), size: 16),
+                          child: Icon(
+                            roleIcon,
+                            color: const Color(0xFF0F172A),
+                            size: 16,
+                          ),
                         ),
                       ),
                     ],
@@ -129,43 +152,82 @@ class _ProfilePageState extends State<ProfilePage> {
                 Center(
                   child: Text(
                     name.isEmpty ? 'Belum Diatur' : name,
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 6),
                 Center(
                   child: Text(
                     roleLabel,
-                    style: TextStyle(color: themeColor, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
+                    style: TextStyle(
+                      color: themeColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Ikhtisar Detail Akun
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     color: const Color(0xFF11172A).withValues(alpha: 0.8),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: themeColor.withValues(alpha: 0.1), width: 1.2),
+                    border: Border.all(
+                      color: themeColor.withValues(alpha: 0.1),
+                      width: 1.2,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('INFORMASI AKUN', style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.bold)),
+                      const Text(
+                        'INFORMASI AKUN',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 14),
-                      _buildProfileRow(themeColor, Icons.mail_outline_rounded, 'Email', email),
+                      _buildProfileRow(
+                        themeColor,
+                        Icons.mail_outline_rounded,
+                        'Email',
+                        email,
+                      ),
                       const Divider(color: Color(0xFF1E293B), height: 24),
-                      _buildProfileRow(themeColor, Icons.phone_android_rounded, 'Nomor HP', phone.isEmpty ? 'Belum Diatur' : phone),
+                      _buildProfileRow(
+                        themeColor,
+                        Icons.phone_android_rounded,
+                        'Nomor HP',
+                        phone.isEmpty ? 'Belum Diatur' : phone,
+                      ),
                       const Divider(color: Color(0xFF1E293B), height: 24),
-                      _buildProfileRow(themeColor, Icons.security_rounded, 'Keamanan', securityDesc),
+                      _buildProfileRow(
+                        themeColor,
+                        Icons.security_rounded,
+                        'Keamanan',
+                        securityDesc,
+                      ),
                       const Divider(color: Color(0xFF1E293B), height: 24),
-                      _buildProfileRow(themeColor, Icons.offline_bolt_rounded, 'Status', status.toUpperCase()),
+                      _buildProfileRow(
+                        themeColor,
+                        Icons.offline_bolt_rounded,
+                        'Status',
+                        status.toUpperCase(),
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 30),
-                
+
                 // Tombol Edit Profil
                 ElevatedButton.icon(
                   onPressed: () {
@@ -176,13 +238,19 @@ class _ProfilePageState extends State<ProfilePage> {
                     foregroundColor: themeColor,
                     shadowColor: Colors.transparent,
                     side: BorderSide(color: themeColor, width: 1.2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   icon: const Icon(Icons.edit_rounded, size: 18),
                   label: const Text(
                     'Edit Profil',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -191,17 +259,28 @@ class _ProfilePageState extends State<ProfilePage> {
                 ElevatedButton.icon(
                   onPressed: () => _logout(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                    backgroundColor: const Color(
+                      0xFFEF4444,
+                    ).withValues(alpha: 0.15),
                     foregroundColor: const Color(0xFFEF4444),
                     shadowColor: Colors.transparent,
-                    side: const BorderSide(color: Color(0xFFEF4444), width: 1.2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    side: const BorderSide(
+                      color: Color(0xFFEF4444),
+                      width: 1.2,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   icon: const Icon(Icons.logout_rounded, size: 18),
                   label: const Text(
                     'Keluar / Log Out',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ],
@@ -227,7 +306,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
                     const SizedBox(width: 8),
@@ -250,7 +332,12 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildProfileRow(Color themeColor, IconData icon, String label, String value) {
+  Widget _buildProfileRow(
+    Color themeColor,
+    IconData icon,
+    String label,
+    String value,
+  ) {
     return Row(
       children: [
         Icon(icon, color: themeColor, size: 18),
@@ -258,9 +345,23 @@ class _ProfilePageState extends State<ProfilePage> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.bold)),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ],

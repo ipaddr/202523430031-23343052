@@ -14,6 +14,7 @@ import '../../styles/app_textstyle.dart';
 import '../../widgets/auth_widgets.dart';
 import '../../widgets/background.dart';
 
+// Halaman registrasi untuk user biasa dan admin station.
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 
@@ -89,6 +90,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _pickStationPhoto() async {
+    // Pilih foto station dari galeri dengan kompresi ringan.
     _clearError();
     try {
       final List<XFile> images = await _picker.pickMultiImage(
@@ -109,6 +111,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _pickLegalDocument() async {
+    // Pilih dokumen legalitas yang akan diunggah ke Cloudinary.
     _clearError();
     try {
       final FilePickerResult? result = await FilePicker.pickFiles(
@@ -121,13 +124,14 @@ class _RegisterPageState extends State<RegisterPage> {
         final List<PlatformFile> filteredFiles = result.files
             .where((file) => file.size < 10 * 1024 * 1024)
             .toList();
-            
+
         if (filteredFiles.length < result.files.length) {
           setState(() {
-            _errorMessage = 'Beberapa file dilewati karena melebihi batas 10 MB.';
+            _errorMessage =
+                'Beberapa file dilewati karena melebihi batas 10 MB.';
           });
         }
-        
+
         setState(() {
           _legalDocFiles.addAll(filteredFiles);
         });
@@ -159,12 +163,18 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<String> _uploadFile(dynamic file) async {
-    if (CloudinaryConfig.cloudName == 'YOUR_CLOUD_NAME' || CloudinaryConfig.uploadPreset == 'YOUR_UPLOAD_PRESET') {
-      throw Exception('Cloudinary belum dikonfigurasi di lib/config/cloudinary_config.dart');
+    // Upload file dipakai ulang untuk foto dan dokumen.
+    if (CloudinaryConfig.cloudName == 'YOUR_CLOUD_NAME' ||
+        CloudinaryConfig.uploadPreset == 'YOUR_UPLOAD_PRESET') {
+      throw Exception(
+        'Cloudinary belum dikonfigurasi di lib/config/cloudinary_config.dart',
+      );
     }
 
     try {
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/${CloudinaryConfig.cloudName}/auto/upload');
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/${CloudinaryConfig.cloudName}/auto/upload',
+      );
       final request = http.MultipartRequest('POST', url);
 
       List<int> bytes;
@@ -174,7 +184,10 @@ class _RegisterPageState extends State<RegisterPage> {
         bytes = await file.readAsBytes();
         fileName = file.name;
       } else if (file is PlatformFile) {
-        bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null) ?? [];
+        bytes =
+            file.bytes ??
+            (file.path != null ? await File(file.path!).readAsBytes() : null) ??
+            [];
         if (bytes.isEmpty) throw Exception('Gagal membaca file');
         fileName = file.name;
       } else {
@@ -182,11 +195,7 @@ class _RegisterPageState extends State<RegisterPage> {
       }
 
       request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: fileName,
-        ),
+        http.MultipartFile.fromBytes('file', bytes, filename: fileName),
       );
 
       request.fields['upload_preset'] = CloudinaryConfig.uploadPreset;
@@ -199,8 +208,12 @@ class _RegisterPageState extends State<RegisterPage> {
         return responseData['secure_url'] as String;
       } else {
         final errorBody = jsonDecode(response.body);
-        final String errorMsg = errorBody['error']?['message'] ?? 'Gagal mengunggah file ke Cloudinary.';
-        throw Exception('Cloudinary: $errorMsg (Status ${response.statusCode})');
+        final String errorMsg =
+            errorBody['error']?['message'] ??
+            'Gagal mengunggah file ke Cloudinary.';
+        throw Exception(
+          'Cloudinary: $errorMsg (Status ${response.statusCode})',
+        );
       }
     } catch (e) {
       throw Exception('Gagal mengunggah berkas ke Cloudinary: ${e.toString()}');
@@ -208,6 +221,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _submit() async {
+    // Submit memisahkan alur registrasi user dan admin station.
     FocusScope.of(context).unfocus();
     _clearError();
 
@@ -251,7 +265,9 @@ class _RegisterPageState extends State<RegisterPage> {
             );
         createdUser = credential.user;
 
-        await credential.user?.updateDisplayName(_ownerNameController.text.trim());
+        await credential.user?.updateDisplayName(
+          _ownerNameController.text.trim(),
+        );
         final String uid = credential.user!.uid;
 
         final db = FirebaseFirestore.instance;
@@ -364,7 +380,9 @@ class _RegisterPageState extends State<RegisterPage> {
       setState(() {
         final String errorStr = e.toString();
         if (errorStr.contains('Exception:')) {
-          _errorMessage = errorStr.substring(errorStr.indexOf('Exception:') + 10);
+          _errorMessage = errorStr.substring(
+            errorStr.indexOf('Exception:') + 10,
+          );
         } else {
           _errorMessage = 'Gagal menyimpan pendaftaran: $errorStr';
         }
@@ -379,6 +397,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   String _mapFirebaseError(String code) {
+    // Ubah kode error Firebase ke pesan yang lebih mudah dipahami.
     switch (code) {
       case 'invalid-email':
         return 'Format email tidak valid.';
@@ -394,6 +413,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _sectionHeader() {
+    // Header ringkas di atas form.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -415,6 +435,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _userForm() {
+    // Form ini dipakai saat mode user aktif.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -498,6 +519,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _adminForm() {
+    // Form ini dipakai saat mode admin station aktif.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -640,7 +662,8 @@ class _RegisterPageState extends State<RegisterPage> {
         _legalDocFiles.isEmpty
             ? _UploadBox(
                 title: 'Upload Dokumen (PDF/JPG)',
-                subtitle: 'Izin usaha atau dokumen pendukung (Bisa pilih lebih dari 1)',
+                subtitle:
+                    'Izin usaha atau dokumen pendukung (Bisa pilih lebih dari 1)',
                 icon: Icons.description_outlined,
                 onTap: _pickLegalDocument,
               )
@@ -684,6 +707,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildPhotoList() {
+    // Daftar foto station tampil horizontal dengan tombol tambah.
     return SizedBox(
       height: 110,
       child: ListView.builder(
@@ -707,7 +731,11 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_photo_alternate_rounded, color: Color(0xFF22D3EE), size: 24),
+                    Icon(
+                      Icons.add_photo_alternate_rounded,
+                      color: Color(0xFF22D3EE),
+                      size: 24,
+                    ),
                     SizedBox(height: 6),
                     Text(
                       'Tambah',
@@ -768,6 +796,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildLegalDocsList() {
+    // Daftar dokumen legalitas ditampilkan sebagai list kartu.
     return Column(
       children: [
         ...List.generate(_legalDocFiles.length, (index) {
@@ -862,7 +891,11 @@ class _RegisterPageState extends State<RegisterPage> {
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.add_circle_outline_rounded, color: Color(0xFF22D3EE), size: 18),
+                Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: Color(0xFF22D3EE),
+                  size: 18,
+                ),
                 SizedBox(width: 8),
                 Text(
                   'Tambah Dokumen Baru',
@@ -881,6 +914,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _toggleRole(bool value) {
+    // Ganti mode registrasi antara user dan admin.
     setState(() {
       _isAdminMode = value;
       _errorMessage = null;
@@ -888,11 +922,13 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _goToLogin() {
+    // Kembali ke halaman login dari form registrasi.
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
   @override
   Widget build(BuildContext context) {
+    // Layout utama berisi header, switch role, form, dan tombol aksi.
     return Scaffold(
       body: GameZoneBackground(
         child: SafeArea(
@@ -968,83 +1004,88 @@ class _RegisterPageState extends State<RegisterPage> {
                                     isAdminMode: _isAdminMode,
                                     onChanged: _toggleRole,
                                   ),
-                            const SizedBox(height: 18),
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 220),
-                              child: _errorMessage == null
-                                  ? const SizedBox.shrink()
-                                  : AuthErrorBanner(
-                                      key: ValueKey(_errorMessage),
-                                      message: _errorMessage!,
-                                    ),
-                            ),
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 250),
-                              child: _isAdminMode ? _adminForm() : _userForm(),
-                            ),
-                            const SizedBox(height: 18),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: Checkbox(
-                                    value: _acceptTerms,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        _acceptTerms = value ?? false;
-                                      });
-                                    },
+                                  const SizedBox(height: 18),
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 220),
+                                    child: _errorMessage == null
+                                        ? const SizedBox.shrink()
+                                        : AuthErrorBanner(
+                                            key: ValueKey(_errorMessage),
+                                            message: _errorMessage!,
+                                          ),
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      _isAdminMode
-                                          ? 'Dengan mendaftar, saya menyetujui proses verifikasi dan kebijakan privasi GameZone.'
-                                          : 'Dengan mendaftar, saya menyetujui Syarat & Ketentuan serta Kebijakan Privasi GameZone.',
-                                      style: const TextStyle(
-                                        color: Color(0xFF8F97B6),
-                                        fontSize: 11,
-                                        height: 1.5,
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 250),
+                                    child: _isAdminMode
+                                        ? _adminForm()
+                                        : _userForm(),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: Checkbox(
+                                          value: _acceptTerms,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              _acceptTerms = value ?? false;
+                                            });
+                                          },
+                                        ),
                                       ),
-                                    ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 2,
+                                          ),
+                                          child: Text(
+                                            _isAdminMode
+                                                ? 'Dengan mendaftar, saya menyetujui proses verifikasi dan kebijakan privasi GameZone.'
+                                                : 'Dengan mendaftar, saya menyetujui Syarat & Ketentuan serta Kebijakan Privasi GameZone.',
+                                            style: const TextStyle(
+                                              color: Color(0xFF8F97B6),
+                                              fontSize: 11,
+                                              height: 1.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 18),
+                                  AuthPrimaryButton(
+                                    isLoading: _isSubmitting,
+                                    onPressed: _submit,
+                                    text: _buttonText,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  AuthFooterPrompt(
+                                    onTap: _goToLogin,
+                                    prefixText: 'Sudah ada akun? ',
+                                    actionText: 'Login',
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 18),
-                            AuthPrimaryButton(
-                              isLoading: _isSubmitting,
-                              onPressed: _submit,
-                              text: _buttonText,
-                            ),
-                            const SizedBox(height: 16),
-                            AuthFooterPrompt(
-                              onTap: _goToLogin,
-                              prefixText: 'Sudah ada akun? ',
-                              actionText: 'Login',
-                            ),
-                            const SizedBox(height: 12),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
-      ],
-    ),
-  ),
-),
-);
-}
+      ),
+    );
+  }
 }
 
 class _UploadBox extends StatelessWidget {
@@ -1062,6 +1103,7 @@ class _UploadBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Kotak upload sederhana untuk memilih file baru.
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -1122,6 +1164,7 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Catatan kecil di bawah form untuk memberi konteks tambahan.
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),

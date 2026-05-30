@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Widget sederhana untuk memuat gambar dari URL dengan fallback
+// Helper umum untuk gambar URL dan pembuka tautan eksternal.
 class CustomImageLoader extends StatelessWidget {
   final String? photoStr;
   final double width;
@@ -28,7 +28,11 @@ class CustomImageLoader extends StatelessWidget {
           color: const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(radius),
         ),
-        child: Icon(fallbackIcon, color: const Color(0xFF64748B), size: width * 0.5),
+        child: Icon(
+          fallbackIcon,
+          color: const Color(0xFF64748B),
+          size: width * 0.5,
+        ),
       );
     }
 
@@ -54,7 +58,7 @@ class CustomImageLoader extends StatelessWidget {
   }
 }
 
-/// Fungsi pembantu untuk membuka URL dokumen/tautan eksternal
+// Membuka URL eksternal dengan fallback pesan jika gagal.
 Future<void> openExternalUrl(BuildContext context, String urlString) async {
   if (urlString.isEmpty) return;
   try {
@@ -62,7 +66,10 @@ Future<void> openExternalUrl(BuildContext context, String urlString) async {
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text('Gagal membuka berkas: $e')),
+        SnackBar(
+          backgroundColor: const Color(0xFFEF4444),
+          content: Text('Gagal membuka berkas: $e'),
+        ),
       );
     }
   }

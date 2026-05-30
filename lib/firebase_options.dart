@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 
+// Konfigurasi Firebase lintas platform yang dibaca saat aplikasi mulai.
 /// `FirebaseOptions` for Android
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {

@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
-import 'package:gamezone/widgets/logo_box.dart';
-import 'package:gamezone/widgets/loading_bar.dart';
+import 'package:gamezone/widgets/startup_widgets.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class SplashPage extends StatefulWidget {
