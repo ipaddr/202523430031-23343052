@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/background.dart';
 import '../../widgets/startup_widgets.dart';
 import '../../styles/app_textstyle.dart';
@@ -51,8 +52,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
         curve: Curves.easeOut,
       );
     } else {
-      Navigator.of(context).pushReplacementNamed('/login');
+      _finishOnboarding();
     }
+  }
+
+  Future<void> _finishOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('seenOnboarding', true);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacementNamed('/login');
   }
 
   @override

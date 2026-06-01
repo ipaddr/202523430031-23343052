@@ -27,9 +27,7 @@ class AuthRoleSwitch extends StatelessWidget {
           Expanded(
             child: GestureDetector(
               onTap: () => onChanged(false),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
+              child: Container(
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
@@ -52,9 +50,7 @@ class AuthRoleSwitch extends StatelessWidget {
           Expanded(
             child: GestureDetector(
               onTap: () => onChanged(true),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
+              child: Container(
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(

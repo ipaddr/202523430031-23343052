@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
+import 'package:gamezone/widgets/background.dart';
 import 'package:gamezone/widgets/startup_widgets.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -39,52 +44,65 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.primaryDarkNavy,
-              AppColors.primaryDarkNavy.withValues(alpha: 0.8),
-              AppColors.accentBlue.withValues(alpha: 0.3),
-            ],
-            stops: const [0.0, 0.5, 1.0],
-          ),
-        ),
+      body: GameZoneBackground(
         child: Stack(
           children: [
-            _buildGamingBackground(),
-
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: ScaleTransition(
-                      scale: _scaleAnimation,
-                      child: _buildLogo(),
-                    ),
+            // Menampilkan background splash aplikasi.
+            Positioned.fill(
+              child: Container(
+                width: double.infinity,
+                height: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primaryDarkNavy,
+                      AppColors.primaryDarkNavy.withValues(alpha: 0.8),
+                      AppColors.accentBlue.withValues(alpha: 0.3),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
                   ),
-
-                  const SizedBox(height: AppTheme.paddingXXL),
-
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: _buildTagline(),
-                  ),
-                ],
+                ),
               ),
             ),
 
-            Positioned(
-              bottom: AppTheme.paddingXXXL,
-              left: 0,
-              right: 0,
-              child: _buildLoadingIndicator(),
+            // Menampilkan konten halaman splash.
+            SafeArea(
+              child: Stack(
+                children: [
+                  _buildGamingBackground(),
+
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: ScaleTransition(
+                            scale: _scaleAnimation,
+                            child: _buildLogo(),
+                          ),
+                        ),
+
+                        const SizedBox(height: AppTheme.paddingXXL),
+
+                        FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: _buildTagline(),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  Positioned(
+                    bottom: AppTheme.paddingXXXL,
+                    left: 0,
+                    right: 0,
+                    child: _buildLoadingIndicator(),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -189,9 +207,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
             duration: const Duration(seconds: 3),
             height: 8,
             onComplete: () {
-              if (mounted) {
-                Navigator.of(context).pushReplacementNamed('/onboarding');
-              }
+              _handleStartupNavigation();
             },
           ),
         ),
@@ -205,6 +221,65 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
         ),
       ],
     );
+  }
+
+  Future<void> _handleStartupNavigation() async {
+    if (!mounted) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getBool('seenOnboarding') ?? false;
+      if (!mounted) return;
+      if (seen) {
+        Navigator.of(context).pushReplacementNamed('/login');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/onboarding');
+      }
+      return;
+    }
+
+    try {
+      final firestore = FirestoreService();
+      final authService = AuthService();
+      final data = await firestore.getUserData(user.uid);
+
+      if (data == null) {
+        // Orphaned auth user - sign out and go to onboarding/login
+        await authService.signOut();
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed('/login');
+        return;
+      }
+
+      final role = data['role'] as String? ?? 'user';
+      final status = data['status'] as String? ?? 'active';
+
+      if (role == 'admin' && status != 'active') {
+        // Not yet verified or rejected - force to login so message appears
+        await authService.signOut();
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed('/login');
+        return;
+      }
+
+      final String nextRoute;
+      if (role == 'superadmin' || role == 'super_admin') {
+        nextRoute = '/superadmin-dashboard';
+      } else if (role == 'admin') {
+        nextRoute = '/admin-dashboard';
+      } else {
+        nextRoute = '/user-dashboard';
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed(nextRoute);
+    } catch (e) {
+      // On error, fall back to onboarding
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed('/onboarding');
+    }
   }
 
   Widget _buildGamingBackground() {

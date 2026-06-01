@@ -1,11 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 
 import '../../styles/app_colors.dart';
 import '../../styles/app_textstyle.dart';
 import '../../widgets/background.dart';
-import '../../widgets/superadmin_widgets.dart';
+import '../../widgets/superadmin/superadmin_activity_item.dart';
+import '../../widgets/superadmin/superadmin_bottom_navbar.dart';
+import '../../widgets/superadmin/superadmin_sheet_header.dart';
+import '../../widgets/superadmin/superadmin_stat_card.dart';
+import '../../widgets/superadmin/superadmin_header.dart';
 import '../profile_page.dart';
 import 'users_page.dart';
 import 'verify_page.dart';
@@ -20,6 +25,8 @@ class SuperAdminDashboardPage extends StatefulWidget {
 }
 
 class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
+  final FirestoreService _firestoreService = FirestoreService();
+  final AuthService _authService = AuthService();
   // Menyimpan tab aktif dan status pembukaan notifikasi secara lokal.
   int _activeTabIndex = 0;
   DateTime? _localLastOpened;
@@ -34,28 +41,33 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   Widget build(BuildContext context) {
     // Layout utama berisi header, konten tab, lalu navigasi bawah.
     return Scaffold(
+      backgroundColor: Colors.transparent,
+      // Mengaktifkan resize agar konten utama menyesuaikan tinggi di atas keyboard
+      resizeToAvoidBottomInset: true,
       body: GameZoneBackground(
         child: SafeArea(
+          // Area konten utama tanpa memotong background navbar di bawah.
+          bottom: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header Tetap (Gaya Desain Figma)
               _buildHeader(),
 
               // Area Konten Dinamis
               Expanded(
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
+                  duration: Duration.zero,
                   child: _buildActiveTabContent(),
                 ),
               ),
 
-              // Navigasi Bar Neon Berkilau
-              SuperAdminBottomNavBar(
-                currentIndex: _activeTabIndex,
-                onTabSelected: (index) =>
-                    setState(() => _activeTabIndex = index),
-              ),
+              // Navigasi Bar Neon Berkilau (Hanya muncul jika keyboard tidak aktif)
+              if (MediaQuery.of(context).viewInsets.bottom == 0)
+                SuperAdminBottomNavBar(
+                  currentIndex: _activeTabIndex,
+                  onTabSelected: (index) =>
+                      setState(() => _activeTabIndex = index),
+                ),
             ],
           ),
         ),
@@ -63,13 +75,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     );
   }
 
-  // --- PEMBUAT KOMPONEN UI ---
-
   Widget _buildHeader() {
-    final currentUser = FirebaseAuth.instance.currentUser;
+    final currentUser = _authService.getCurrentUser();
 
-    // Header dipindahkan ke widget bersama agar file ini lebih pendek.
-    return SuperAdminTopBar(
+    return SuperAdminHeader(
       currentUser: currentUser,
       localLastOpened: _localLastOpened,
       onNotificationOpened: _handleNotificationOpened,
@@ -102,10 +111,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               // Daftar Notifikasi Khusus Admin Game Station
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('users')
-                      .where('role', isEqualTo: 'admin')
-                      .snapshots(),
+                  stream: _firestoreService.getPendingAdminsStream(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(
@@ -205,14 +211,10 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
               // Daftar Semua Aktivitas
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('users')
-                      .snapshots(),
+                  stream: _firestoreService.getUsersStream(),
                   builder: (context, userSnapshot) {
                     return StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('stations')
-                          .snapshots(),
+                      stream: _firestoreService.getStationsStream(),
                       builder: (context, stationSnapshot) {
                         final List<Map<String, dynamic>> activities = [];
 
@@ -256,12 +258,13 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                                 data['createdAt'] as Timestamp?;
                             final String namaStation =
                                 data['namaStation'] ?? 'Game Station';
-                            final int rooms = data['jumlahRooms'] ?? 0;
+                            final int units =
+                                data['jumlahUnits'] ?? data['totalUnits'] ?? 0;
 
                             activities.add({
-                              'title': 'Tambah Room Game Station',
+                              'title': 'Tambah Unit Game Station',
                               'subtitle':
-                                  'Station "$namaStation" memiliki $rooms Room/PC',
+                                  'Station "$namaStation" memiliki $units Unit',
                               'timestamp': createdAt,
                               'categoryText': 'Station',
                               'icon': Icons.add_business_rounded,
@@ -333,43 +336,37 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
   }
 
-  // --- TAB 1: BERANDA (Tata Letak Figma) ---
-  // --- TAB 1: BERANDA (Statistik & Lini Masa Firestore Langsung) ---
   Widget _buildBerandaTab() {
     // Beranda menampilkan statistik utama dan lima aktivitas terbaru.
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').snapshots(),
+      stream: _firestoreService.getUsersStream(),
       builder: (context, userSnapshot) {
         return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('stations').snapshots(),
+          stream: _firestoreService.getStationsStream(),
           builder: (context, stationSnapshot) {
-            // Hitung metrik database dinamis
-            int totalUsers = 0;
-            int totalStations = 0;
-            int totalRooms = 0;
-            int totalAdmins = 0;
+            return StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('units').snapshots(),
+              builder: (context, unitSnapshot) {
+                // Hitung metrik database dinamis
+                int totalUsers = 0;
+                int totalStations = 0;
+                int totalUnits = unitSnapshot.data?.docs.length ?? 0;
+                int totalAdmins = 0;
 
-            if (userSnapshot.hasData) {
-              final usersList = userSnapshot.data!.docs;
-              totalUsers = usersList
-                  .where((doc) => doc.get('role') == 'user')
-                  .length;
-              totalAdmins = usersList
-                  .where((doc) => doc.get('role') == 'admin')
-                  .length;
-            }
+                if (userSnapshot.hasData) {
+                  final usersList = userSnapshot.data!.docs;
+                  totalUsers = usersList
+                      .where((doc) => doc.get('role') == 'user')
+                      .length;
+                  totalAdmins = usersList
+                      .where((doc) => doc.get('role') == 'admin')
+                      .length;
+                }
 
-            if (stationSnapshot.hasData) {
-              final stationsList = stationSnapshot.data!.docs;
-              totalStations = stationsList.length;
-              for (var doc in stationsList) {
-                final data = doc.data() as Map<String, dynamic>;
-                final rooms = data['jumlahRooms'] ?? 0;
-                totalRooms += (rooms is int)
-                    ? rooms
-                    : (int.tryParse(rooms.toString()) ?? 0);
-              }
-            }
+                if (stationSnapshot.hasData) {
+                  final stationsList = stationSnapshot.data!.docs;
+                  totalStations = stationsList.length;
+                }
 
             // Gabungkan ke dalam umpan aktivitas dinamis kronologis
             final List<Map<String, dynamic>> activities = [];
@@ -412,11 +409,12 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 final Timestamp? createdAt = data['createdAt'] as Timestamp?;
                 final String namaStation =
                     data['namaStation'] ?? 'Game Station';
-                final int rooms = data['jumlahRooms'] ?? 0;
+                final int units =
+                    data['jumlahUnits'] ?? data['totalUnits'] ?? 0;
 
                 activities.add({
-                  'title': 'Tambah Room Game Station',
-                  'subtitle': 'Station "$namaStation" memiliki $rooms Room/PC',
+                  'title': 'Tambah Unit Game Station',
+                  'subtitle': 'Station "$namaStation" memiliki $units Unit',
                   'timestamp': createdAt,
                   'categoryText': 'Station',
                   'isCyanStatus': false,
@@ -478,8 +476,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         SuperAdminStatCard(
                           icon: Icons.meeting_room_rounded,
                           iconColor: const Color(0xFF22D3EE),
-                          label: 'TOTAL ROOM',
-                          value: totalRooms.toString().replaceAllMapped(
+                          label: 'TOTAL UNIT',
+                          value: totalUnits.toString().replaceAllMapped(
                             RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
                             (Match m) => '${m[1]},',
                           ),
@@ -562,6 +560,8 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                   ],
                 ),
               ),
+            );
+              },
             );
           },
         );

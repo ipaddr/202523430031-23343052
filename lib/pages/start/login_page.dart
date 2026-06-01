@@ -1,7 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 
 import '../../styles/app_colors.dart';
 import '../../styles/app_textstyle.dart';
@@ -18,6 +19,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final AuthService _authService = AuthService();
+  final FirestoreService _firestoreService = FirestoreService();
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -46,29 +49,25 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await _authService.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-
+ 
       if (!mounted) {
         return;
       }
       String role = 'user';
       final userId = credential.user?.uid;
       if (userId != null) {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .get();
-        final data = snapshot.data();
+        final data = await _firestoreService.getUserData(userId);
         if (data != null) {
           if (data['role'] is String) {
             role = data['role'] as String;
           }
           final String status = data['status'] ?? 'active';
           if (role == 'admin' && status == 'pending') {
-            await FirebaseAuth.instance.signOut();
+            await _authService.signOut();
             setState(() {
               _errorMessage =
                   'Akun Admin Anda masih dalam proses verifikasi oleh Super Admin. Harap tunggu.';
@@ -76,7 +75,7 @@ class _LoginPageState extends State<LoginPage> {
             });
             return;
           } else if (role == 'admin' && status == 'rejected') {
-            await FirebaseAuth.instance.signOut();
+            await _authService.signOut();
             setState(() {
               _errorMessage =
                   'Pendaftaran Admin Anda ditolak oleh Super Admin.';
@@ -150,7 +149,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      await _authService.sendPasswordResetEmail(_emailController.text.trim());
       if (!mounted) {
         return;
       }
@@ -198,7 +197,7 @@ class _LoginPageState extends State<LoginPage> {
       List<String> signInMethods = [];
       try {
         // ignore: deprecated_member_use
-        signInMethods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(
+        signInMethods = await _authService.fetchSignInMethodsForEmail(
           email,
         );
       } catch (e) {
@@ -220,34 +219,22 @@ class _LoginPageState extends State<LoginPage> {
         }
       }
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-      final OAuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
       // Login ke Firebase Auth terlebih dahulu agar pengguna terautentikasi.
       // Hal ini diperlukan agar kita memiliki hak akses (read permission) ke Firestore.
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(
-        credential,
-      );
+      final userCredential = await _authService.signInWithGoogle(googleUser: googleUser);
       final user = userCredential.user;
-
+ 
       if (user == null) {
         throw FirebaseAuthException(
           code: 'user-null',
           message: 'Gagal mendapatkan data pengguna dari Google.',
         );
       }
-
+ 
       // Pengecekan pendaftaran di Firestore menggunakan UID pengguna yang telah terautentikasi
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      if (!userDoc.exists) {
+      final userData = await _firestoreService.getUserData(user.uid);
+ 
+      if (userData == null) {
         // Jika belum terdaftar di Firestore, batalkan login.
         // Hapus akun di Firebase Auth jika ini adalah pengguna baru agar tidak meninggalkan data kosong (orphaned account).
         if (userCredential.additionalUserInfo?.isNewUser == true) {
@@ -259,8 +246,7 @@ class _LoginPageState extends State<LoginPage> {
             );
           }
         }
-        await FirebaseAuth.instance.signOut();
-        await googleSignIn.signOut();
+        await _authService.signOut();
         setState(() {
           _errorMessage =
               'Akun Google Anda (${user.email}) belum terdaftar. Silakan daftar terlebih dahulu.';
@@ -268,15 +254,13 @@ class _LoginPageState extends State<LoginPage> {
         });
         return;
       }
-
+ 
       // Ambil data peran dan status dari Firestore
-      final userData = userDoc.data()!;
       final role = userData['role'] as String? ?? 'user';
       final status = userData['status'] as String? ?? 'active';
-
+ 
       if (role == 'admin' && status == 'pending') {
-        await FirebaseAuth.instance.signOut();
-        await googleSignIn.signOut();
+        await _authService.signOut();
         setState(() {
           _errorMessage =
               'Akun Admin Anda masih dalam proses verifikasi oleh Super Admin. Harap tunggu.';
@@ -284,8 +268,7 @@ class _LoginPageState extends State<LoginPage> {
         });
         return;
       } else if (role == 'admin' && status == 'rejected') {
-        await FirebaseAuth.instance.signOut();
-        await googleSignIn.signOut();
+        await _authService.signOut();
         setState(() {
           _errorMessage = 'Pendaftaran Admin Anda ditolak oleh Super Admin.';
           _isLoading = false;

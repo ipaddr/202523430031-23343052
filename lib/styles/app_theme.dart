@@ -40,6 +40,9 @@ class AppTheme {
   static ThemeData get theme {
     return ThemeData(
       useMaterial3: true,
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      hoverColor: Colors.transparent,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.primaryDarkNavy,
       primaryColor: AppColors.accentBlue,

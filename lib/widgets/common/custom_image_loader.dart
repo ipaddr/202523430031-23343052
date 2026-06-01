@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-// Helper umum untuk gambar URL dan pembuka tautan eksternal.
 class CustomImageLoader extends StatelessWidget {
   final String? photoStr;
   final double width;
@@ -55,22 +53,5 @@ class CustomImageLoader extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-// Membuka URL eksternal dengan fallback pesan jika gagal.
-Future<void> openExternalUrl(BuildContext context, String urlString) async {
-  if (urlString.isEmpty) return;
-  try {
-    await launchUrl(Uri.parse(urlString), mode: LaunchMode.externalApplication);
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: const Color(0xFFEF4444),
-          content: Text('Gagal membuka berkas: $e'),
-        ),
-      );
-    }
   }
 }

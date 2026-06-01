@@ -1,18 +1,15 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
 
-import '../../config/cloudinary_config.dart';
 import '../../styles/app_colors.dart';
 import '../../styles/app_textstyle.dart';
 import '../../widgets/auth_widgets.dart';
 import '../../widgets/background.dart';
+import '../../services/registration_service.dart';
 
 // Halaman registrasi untuk user biasa dan admin station.
 class RegisterPage extends StatefulWidget {
@@ -23,6 +20,17 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  static const List<String> _operationalDayLabels = [
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu',
+  ];
+
+  final RegistrationService _registrationService = RegistrationService();
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
@@ -30,11 +38,11 @@ class _RegisterPageState extends State<RegisterPage> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  // Data form pendaftaran game station
   final _stationNameController = TextEditingController();
   final _ownerNameController = TextEditingController();
   final _businessEmailController = TextEditingController();
   final _businessPhoneController = TextEditingController();
-  final _roomsController = TextEditingController();
   final _addressController = TextEditingController();
 
   bool _isAdminMode = false;
@@ -44,16 +52,27 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _selectedStationType;
   String? _errorMessage;
 
+  late final List<_OperationalScheduleItem> _operationalScheduleItems =
+      List.generate(
+        _operationalDayLabels.length,
+        (index) => _OperationalScheduleItem(
+          dayLabel: _operationalDayLabels[index],
+          isOpen: true,
+          startTime: const TimeOfDay(hour: 10, minute: 0),
+          endTime: const TimeOfDay(hour: 22, minute: 0),
+        ),
+      );
+
   final List<XFile> _stationPhotoFiles = [];
   final List<PlatformFile> _legalDocFiles = [];
   final ImagePicker _picker = ImagePicker();
 
+  // Daftar kategori game station yang tersedia
   final List<String> _stationTypes = const [
     'Gaming Center',
-    'Esports Arena',
-    'Racing Room',
-    'VR Station',
-    'Console Lounge',
+    'Esports Center',
+    'Console Center',
+    'VR Center',
   ];
 
   @override
@@ -66,7 +85,6 @@ class _RegisterPageState extends State<RegisterPage> {
     _ownerNameController.dispose();
     _businessEmailController.dispose();
     _businessPhoneController.dispose();
-    _roomsController.dispose();
     _addressController.dispose();
     super.dispose();
   }
@@ -89,6 +107,55 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
+  Future<void> _showPopupMessage({
+    required String title,
+    required String message,
+    bool isError = true,
+  }) async {
+    if (!mounted) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF11182D),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: isError
+                  ? const Color(0xFFEF4444).withValues(alpha: 0.45)
+                  : const Color(0xFF22D3EE).withValues(alpha: 0.35),
+            ),
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(color: Color(0xFFD5DBF2), height: 1.45),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Tutup'),
+            ),
+          ],
+        );
+      },
+    );
+
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   Future<void> _pickStationPhoto() async {
     // Pilih foto station dari galeri dengan kompresi ringan.
     _clearError();
@@ -104,9 +171,10 @@ class _RegisterPageState extends State<RegisterPage> {
         });
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Gagal memilih foto stasiun game.';
-      });
+      await _showPopupMessage(
+        title: 'Gagal memilih foto',
+        message: 'Gagal memilih foto stasiun game.',
+      );
     }
   }
 
@@ -126,10 +194,11 @@ class _RegisterPageState extends State<RegisterPage> {
             .toList();
 
         if (filteredFiles.length < result.files.length) {
-          setState(() {
-            _errorMessage =
-                'Beberapa file dilewati karena melebihi batas 10 MB.';
-          });
+          await _showPopupMessage(
+            title: 'Ukuran file terlalu besar',
+            message: 'Beberapa file dilewati karena melebihi batas 10 MB.',
+            isError: false,
+          );
         }
 
         setState(() {
@@ -137,9 +206,10 @@ class _RegisterPageState extends State<RegisterPage> {
         });
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Gagal memilih dokumen legalitas.';
-      });
+      await _showPopupMessage(
+        title: 'Gagal memilih dokumen',
+        message: 'Gagal memilih dokumen legalitas.',
+      );
     }
   }
 
@@ -162,165 +232,78 @@ class _RegisterPageState extends State<RegisterPage> {
     return '${(bytes / pow(1024, i)).toStringAsFixed(1)} ${suffixes[i]}';
   }
 
-  Future<String> _uploadFile(dynamic file) async {
-    // Upload file dipakai ulang untuk foto dan dokumen.
-    if (CloudinaryConfig.cloudName == 'YOUR_CLOUD_NAME' ||
-        CloudinaryConfig.uploadPreset == 'YOUR_UPLOAD_PRESET') {
-      throw Exception(
-        'Cloudinary belum dikonfigurasi di lib/config/cloudinary_config.dart',
-      );
-    }
-
-    try {
-      final url = Uri.parse(
-        'https://api.cloudinary.com/v1_1/${CloudinaryConfig.cloudName}/auto/upload',
-      );
-      final request = http.MultipartRequest('POST', url);
-
-      List<int> bytes;
-      String fileName;
-
-      if (file is XFile) {
-        bytes = await file.readAsBytes();
-        fileName = file.name;
-      } else if (file is PlatformFile) {
-        bytes =
-            file.bytes ??
-            (file.path != null ? await File(file.path!).readAsBytes() : null) ??
-            [];
-        if (bytes.isEmpty) throw Exception('Gagal membaca file');
-        fileName = file.name;
-      } else {
-        throw Exception('Format file tidak didukung');
-      }
-
-      request.files.add(
-        http.MultipartFile.fromBytes('file', bytes, filename: fileName),
-      );
-
-      request.fields['upload_preset'] = CloudinaryConfig.uploadPreset;
-
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
-        return responseData['secure_url'] as String;
-      } else {
-        final errorBody = jsonDecode(response.body);
-        final String errorMsg =
-            errorBody['error']?['message'] ??
-            'Gagal mengunggah file ke Cloudinary.';
-        throw Exception(
-          'Cloudinary: $errorMsg (Status ${response.statusCode})',
-        );
-      }
-    } catch (e) {
-      throw Exception('Gagal mengunggah berkas ke Cloudinary: ${e.toString()}');
-    }
-  }
-
   Future<void> _submit() async {
     // Submit memisahkan alur registrasi user dan admin station.
     FocusScope.of(context).unfocus();
     _clearError();
 
     if (!_acceptTerms) {
-      setState(() {
-        _errorMessage = 'Silakan setujui syarat dan kebijakan terlebih dahulu.';
-      });
+      await _showPopupMessage(
+        title: 'Syarat belum disetujui',
+        message: 'Silakan setujui syarat dan kebijakan terlebih dahulu.',
+      );
       return;
     }
 
+    // Validasi form sebelum submit
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
     if (_isAdminMode) {
       if (_stationPhotoFiles.isEmpty) {
-        setState(() {
-          _errorMessage = 'Foto Game Station wajib diunggah.';
-        });
+        await _showPopupMessage(
+          title: 'Foto utama belum ada',
+          message: 'Foto Utama Game Station wajib diunggah.',
+        );
         return;
       }
       if (_legalDocFiles.isEmpty) {
-        setState(() {
-          _errorMessage = 'Bukti Legalitas / Izin wajib diunggah.';
-        });
+        await _showPopupMessage(
+          title: 'Dokumen legalitas belum ada',
+          message: 'Bukti Legalitas / Izin wajib diunggah.',
+        );
         return;
+      }
+      final List<Map<String, dynamic>> operationalHoursPayload =
+          _buildOperationalHoursPayload();
+      if (operationalHoursPayload.isEmpty) {
+        await _showPopupMessage(
+          title: 'Jadwal operasional kosong',
+          message: 'Minimal satu hari operasional harus dipilih.',
+        );
+        return;
+      }
+      for (final item in _operationalScheduleItems) {
+        if (!item.isOpen) continue;
+        if (!_isEndTimeAfterStartTime(item.startTime, item.endTime)) {
+          await _showPopupMessage(
+            title: 'Jam operasional tidak valid',
+            message:
+                'Jam tutup harus lebih besar dari jam buka untuk ${item.dayLabel}.',
+          );
+          return;
+        }
       }
     }
 
     setState(() {
       _isSubmitting = true;
     });
-
-    User? createdUser;
     try {
       if (_isAdminMode) {
-        final credential = await FirebaseAuth.instance
-            .createUserWithEmailAndPassword(
-              email: _businessEmailController.text.trim(),
-              password: _passwordController.text.trim(),
-            );
-        createdUser = credential.user;
-
-        await credential.user?.updateDisplayName(
-          _ownerNameController.text.trim(),
+        await _registrationService.registerAdminStation(
+          ownerName: _ownerNameController.text.trim(),
+          businessEmail: _businessEmailController.text.trim(),
+          businessPhone: _businessPhoneController.text.trim(),
+          password: _passwordController.text.trim(),
+          stationName: _stationNameController.text.trim(),
+          address: _addressController.text.trim(),
+          stationType: _selectedStationType ?? '',
+          operationalHours: _buildOperationalHoursPayload(),
+          stationPhotoFiles: _stationPhotoFiles,
+          legalDocFiles: _legalDocFiles,
         );
-        final String uid = credential.user!.uid;
-
-        final db = FirebaseFirestore.instance;
-        final ownerRef = db.collection('users').doc(uid);
-        final stationRef = db.collection('stations').doc();
-
-        // Upload photos in parallel
-        final List<Future<String>> photoUploadFutures = [];
-        for (int i = 0; i < _stationPhotoFiles.length; i++) {
-          final file = _stationPhotoFiles[i];
-          photoUploadFutures.add(_uploadFile(file));
-        }
-        final List<String> photoUrls = await Future.wait(photoUploadFutures);
-
-        // Upload documents in parallel
-        final List<Future<String>> docUploadFutures = [];
-        for (int i = 0; i < _legalDocFiles.length; i++) {
-          final file = _legalDocFiles[i];
-          docUploadFutures.add(_uploadFile(file));
-        }
-        final List<String> docUrls = await Future.wait(docUploadFutures);
-
-        final batch = db.batch();
-        batch.set(ownerRef, {
-          'nama': _ownerNameController.text.trim(),
-          'email': _businessEmailController.text.trim(),
-          'noHp': _businessPhoneController.text.trim(),
-          'foto': '',
-          'role': 'admin',
-          'status': 'pending',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-        batch.set(stationRef, {
-          'namaStation': _stationNameController.text.trim(),
-          'namaOwner': _ownerNameController.text.trim(),
-          'emailOwner': _businessEmailController.text.trim(),
-          'noHpOwner': _businessPhoneController.text.trim(),
-          'ownerId': uid,
-          'alamat': _addressController.text.trim(),
-          'jenis': _selectedStationType ?? '',
-          'foto': photoUrls,
-          'buktiLegalitas': docUrls,
-          'jumlahRooms': int.tryParse(_roomsController.text.trim()) ?? 0,
-          'rating': 0,
-          'totalReview': 0,
-          'totalPemasukan': 0,
-          'statusVerifikasi': 'pending',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-        await batch.commit();
-
-        // Sign out because createUserWithEmailAndPassword automatically signs in the user
-        await FirebaseAuth.instance.signOut();
 
         if (!mounted) {
           return;
@@ -332,26 +315,12 @@ class _RegisterPageState extends State<RegisterPage> {
         );
         Navigator.of(context).pushReplacementNamed('/login');
       } else {
-        final credential = await FirebaseAuth.instance
-            .createUserWithEmailAndPassword(
-              email: _emailController.text.trim(),
-              password: _passwordController.text.trim(),
-            );
-        createdUser = credential.user;
-
-        await credential.user?.updateDisplayName(_nameController.text.trim());
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(credential.user!.uid)
-            .set({
-              'nama': _nameController.text.trim(),
-              'email': _emailController.text.trim(),
-              'noHp': _phoneController.text.trim(),
-              'foto': '',
-              'role': 'user',
-              'status': 'active',
-              'createdAt': FieldValue.serverTimestamp(),
-            });
+        await _registrationService.registerRegularUser(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: _phoneController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
 
         if (!mounted) {
           return;
@@ -362,31 +331,19 @@ class _RegisterPageState extends State<RegisterPage> {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _errorMessage = _mapFirebaseError(error.code);
-      });
+      await _showPopupMessage(
+        title: 'Registrasi gagal',
+        message: _mapFirebaseError(error.code),
+      );
     } catch (e) {
-      // Rollback Auth User if database write fails to prevent orphaned Auth account
-      if (createdUser != null) {
-        try {
-          await createdUser.delete();
-        } catch (deleteError) {
-          debugPrint('Gagal menghapus user setelah error: $deleteError');
-        }
-      }
       if (!mounted) {
         return;
       }
-      setState(() {
-        final String errorStr = e.toString();
-        if (errorStr.contains('Exception:')) {
-          _errorMessage = errorStr.substring(
-            errorStr.indexOf('Exception:') + 10,
-          );
-        } else {
-          _errorMessage = 'Gagal menyimpan pendaftaran: $errorStr';
-        }
-      });
+      final String errorStr = e.toString();
+      final String message = errorStr.contains('Exception:')
+          ? errorStr.substring(errorStr.indexOf('Exception:') + 10)
+          : 'Gagal menyimpan pendaftaran: $errorStr';
+      await _showPopupMessage(title: 'Registrasi gagal', message: message);
     } finally {
       if (mounted) {
         setState(() {
@@ -609,22 +566,6 @@ class _RegisterPageState extends State<RegisterPage> {
           },
         ),
         const SizedBox(height: 14),
-        const AuthFieldLabel(text: 'JUMLAH ROOM / PC'),
-        const SizedBox(height: 8),
-        AuthGameZoneField(
-          controller: _roomsController,
-          hintText: 'Contoh: 15',
-          prefixIcon: Icons.tag_rounded,
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.next,
-          validator: (value) {
-            if ((value ?? '').trim().isEmpty) {
-              return 'Jumlah room/PC wajib diisi.';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 14),
         const AuthFieldLabel(text: 'ALAMAT LENGKAP'),
         const SizedBox(height: 8),
         TextFormField(
@@ -646,12 +587,17 @@ class _RegisterPageState extends State<RegisterPage> {
           },
         ),
         const SizedBox(height: 14),
-        const AuthFieldLabel(text: 'FOTO GAME STATION'),
+        const AuthFieldLabel(text: 'JAM OPERASIONAL'),
+        const SizedBox(height: 8),
+        _buildOperationalHoursEditor(),
+        const SizedBox(height: 14),
+        const AuthFieldLabel(text: 'FOTO UTAMA GAME STATION'),
         const SizedBox(height: 8),
         _stationPhotoFiles.isEmpty
             ? _UploadBox(
-                title: 'Upload Foto Utama',
-                subtitle: 'PNG/JPG (Bisa pilih lebih dari 1)',
+                title: 'Foto Utama Game Station',
+                subtitle:
+                    'Upload foto tampilan utama Game Station yang akan ditampilkan kepada pengguna.',
                 icon: Icons.camera_alt_outlined,
                 onTap: _pickStationPhoto,
               )
@@ -663,7 +609,7 @@ class _RegisterPageState extends State<RegisterPage> {
             ? _UploadBox(
                 title: 'Upload Dokumen (PDF/JPG)',
                 subtitle:
-                    'Izin usaha atau dokumen pendukung (Bisa pilih lebih dari 1)',
+                    'Izin usaha / Dokumen Pendukung (Bisa pilih lebih dari 1)',
                 icon: Icons.description_outlined,
                 onTap: _pickLegalDocument,
               )
@@ -700,7 +646,7 @@ class _RegisterPageState extends State<RegisterPage> {
         const SizedBox(height: 14),
         const _InfoCard(
           text:
-              'Catatan: Data akan diverifikasi oleh super admin dalam 1x24 jam sebelum akun aktif dan muncul di pencarian.',
+              'Catatan: Data akan diverifikasi oleh Super Admin sebelum Game Station tampil di aplikasi.',
         ),
       ],
     );
@@ -913,6 +859,193 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  Widget _buildOperationalHoursEditor() {
+    // Jadwal operasional dibuat per hari agar admin bisa memilih hari dan rentang jam.
+    return Column(
+      children: [
+        for (var index = 0; index < _operationalScheduleItems.length; index++)
+          _buildOperationalDayCard(index),
+      ],
+    );
+  }
+
+  Widget _buildOperationalDayCard(int index) {
+    final item = _operationalScheduleItems[index];
+    final String startText = _formatTimeOfDay(item.startTime);
+    final String endText = _formatTimeOfDay(item.endTime);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF11182D),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF22D3EE).withValues(alpha: 0.25),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Switch(
+                value: item.isOpen,
+                onChanged: (value) {
+                  setState(() {
+                    item.isOpen = value;
+                  });
+                },
+                activeThumbColor: AppColors.accentCyan,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item.dayLabel,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                item.isOpen ? 'Buka' : 'Tutup',
+                style: TextStyle(
+                  color: item.isOpen
+                      ? const Color(0xFF22D3EE)
+                      : const Color(0xFF94A3B8),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          if (item.isOpen) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTimePickerButton(
+                    label: 'Buka',
+                    valueText: startText,
+                    onTap: () => _pickOperationalTime(index, true),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildTimePickerButton(
+                    label: 'Tutup',
+                    valueText: endText,
+                    onTap: () => _pickOperationalTime(index, false),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimePickerButton({
+    required String label,
+    required String valueText,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141B31),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF24304A)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              valueText,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickOperationalTime(int index, bool isStart) async {
+    final item = _operationalScheduleItems[index];
+    final TimeOfDay initialTime = isStart ? item.startTime : item.endTime;
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            timePickerTheme: const TimePickerThemeData(
+              backgroundColor: Color(0xFF0F172A),
+            ),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      item.isOpen = true;
+      if (isStart) {
+        item.startTime = picked;
+      } else {
+        item.endTime = picked;
+      }
+    });
+  }
+
+  List<Map<String, dynamic>> _buildOperationalHoursPayload() {
+    return _operationalScheduleItems
+        .where((item) => item.isOpen)
+        .map(
+          (item) => {
+            'hari': item.dayLabel,
+            'buka': _formatTimeOfDay(item.startTime),
+            'tutup': _formatTimeOfDay(item.endTime),
+            'isOpen': item.isOpen,
+          },
+        )
+        .toList();
+  }
+
+  bool _isEndTimeAfterStartTime(TimeOfDay start, TimeOfDay end) {
+    final int startMinutes = start.hour * 60 + start.minute;
+    final int endMinutes = end.hour * 60 + end.minute;
+    return endMinutes > startMinutes;
+  }
+
+  String _formatTimeOfDay(TimeOfDay time) {
+    final String hour = time.hour.toString().padLeft(2, '0');
+    final String minute = time.minute.toString().padLeft(2, '0');
+    return '$hour.$minute';
+  }
+
   void _toggleRole(bool value) {
     // Ganti mode registrasi antara user dan admin.
     setState(() {
@@ -926,158 +1059,43 @@ class _RegisterPageState extends State<RegisterPage> {
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Layout utama berisi header, switch role, form, dan tombol aksi.
-    return Scaffold(
-      body: GameZoneBackground(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _buildPageHeader() {
+    // Header atas hanya berisi tombol kembali dan judul halaman.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 430),
+          child: Row(
             children: [
-              // Sticky Header (Back Button & Title)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 430),
-                    child: Row(
-                      children: [
-                        InkWell(
-                          onTap: _goToLogin,
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF141B31),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFF23304C),
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _pageTitle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
+              InkWell(
+                onTap: _goToLogin,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141B31),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF23304C)),
+                  ),
+                  child: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: Colors.white,
+                    size: 20,
                   ),
                 ),
               ),
-              // Scrollable Content
+              const SizedBox(width: 12),
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight,
-                        ),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 430),
-                            child: Form(
-                              key: _formKey,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _sectionHeader(),
-                                  const SizedBox(height: 18),
-                                  AuthRoleSwitch(
-                                    isAdminMode: _isAdminMode,
-                                    onChanged: _toggleRole,
-                                  ),
-                                  const SizedBox(height: 18),
-                                  AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 220),
-                                    child: _errorMessage == null
-                                        ? const SizedBox.shrink()
-                                        : AuthErrorBanner(
-                                            key: ValueKey(_errorMessage),
-                                            message: _errorMessage!,
-                                          ),
-                                  ),
-                                  AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 250),
-                                    child: _isAdminMode
-                                        ? _adminForm()
-                                        : _userForm(),
-                                  ),
-                                  const SizedBox(height: 18),
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: Checkbox(
-                                          value: _acceptTerms,
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _acceptTerms = value ?? false;
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: 2,
-                                          ),
-                                          child: Text(
-                                            _isAdminMode
-                                                ? 'Dengan mendaftar, saya menyetujui proses verifikasi dan kebijakan privasi GameZone.'
-                                                : 'Dengan mendaftar, saya menyetujui Syarat & Ketentuan serta Kebijakan Privasi GameZone.',
-                                            style: const TextStyle(
-                                              color: Color(0xFF8F97B6),
-                                              fontSize: 11,
-                                              height: 1.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 18),
-                                  AuthPrimaryButton(
-                                    isLoading: _isSubmitting,
-                                    onPressed: _submit,
-                                    text: _buttonText,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  AuthFooterPrompt(
-                                    onTap: _goToLogin,
-                                    prefixText: 'Sudah ada akun? ',
-                                    actionText: 'Login',
-                                  ),
-                                  const SizedBox(height: 12),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                child: Text(
+                  _pageTitle,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -1086,6 +1104,148 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
     );
   }
+
+  Widget _buildModeSwitcher() {
+    // Switch mode user/admin tetap dipertahankan di area form utama.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AuthRoleSwitch(isAdminMode: _isAdminMode, onChanged: _toggleRole),
+      ],
+    );
+  }
+
+  Widget _buildFormSwitcher() {
+    // Form user dan admin dipilih sesuai mode tanpa mengubah layout visual.
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: _isAdminMode ? _adminForm() : _userForm(),
+    );
+  }
+
+  Widget _buildTermsSection() {
+    // Bagian persetujuan syarat dan kebijakan dipisah agar alur form lebih rapi.
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 22,
+          height: 22,
+          child: Checkbox(
+            value: _acceptTerms,
+            onChanged: (value) {
+              setState(() {
+                _acceptTerms = value ?? false;
+              });
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              _isAdminMode
+                  ? 'Dengan mendaftar, saya menyetujui proses verifikasi dan kebijakan privasi GameZone.'
+                  : 'Dengan mendaftar, saya menyetujui Syarat & Ketentuan serta Kebijakan Privasi GameZone.',
+              style: const TextStyle(
+                color: Color(0xFF8F97B6),
+                fontSize: 11,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionsSection() {
+    // Tombol submit dan footer tetap berada di bagian bawah form.
+    return Column(
+      children: [
+        AuthPrimaryButton(
+          isLoading: _isSubmitting,
+          onPressed: _submit,
+          text: _buttonText,
+        ),
+        const SizedBox(height: 16),
+        AuthFooterPrompt(
+          onTap: _goToLogin,
+          prefixText: 'Sudah ada akun? ',
+          actionText: 'Login',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScrollableContent() {
+    // Konten utama dibuat scrollable agar form panjang tetap nyaman di layar kecil.
+    return Expanded(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 430),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _sectionHeader(),
+                        const SizedBox(height: 18),
+                        _buildModeSwitcher(),
+                        const SizedBox(height: 18),
+                        _buildFormSwitcher(),
+                        const SizedBox(height: 18),
+                        _buildTermsSection(),
+                        const SizedBox(height: 18),
+                        _buildActionsSection(),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Layout utama tetap sama, hanya dipecah ke helper private agar lebih rapi.
+    return Scaffold(
+      body: GameZoneBackground(
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [_buildPageHeader(), _buildScrollableContent()],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OperationalScheduleItem {
+  final String dayLabel;
+  bool isOpen;
+  TimeOfDay startTime;
+  TimeOfDay endTime;
+
+  _OperationalScheduleItem({
+    required this.dayLabel,
+    required this.isOpen,
+    required this.startTime,
+    required this.endTime,
+  });
 }
 
 class _UploadBox extends StatelessWidget {

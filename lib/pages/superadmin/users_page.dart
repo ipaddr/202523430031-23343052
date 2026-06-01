@@ -1,6 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../../widgets/utils.dart';
+import '../../services/firestore_service.dart';
+import 'package:gamezone/widgets/common/custom_image_loader.dart';
+import '../../styles/app_colors.dart';
+import '../../styles/app_textstyle.dart';
+import '../../styles/app_theme.dart';
 import 'users_detail_page.dart';
 
 /// Halaman Kelola Pengguna & Game Station untuk Super Admin
@@ -12,8 +16,16 @@ class UsersPage extends StatefulWidget {
 }
 
 class _UsersPageState extends State<UsersPage> {
+  final FirestoreService _firestoreService = FirestoreService();
+  final TextEditingController _searchController = TextEditingController();
   String _userSearchQuery = '';
   int _activeTab = 0; // 0 = Semua Users, 1 = Pengguna, 2 = Game Station
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   // Aksi hapus untuk data user di Firestore.
   Future<void> _deleteUser(String userId, String name) async {
@@ -23,10 +35,7 @@ class _UsersPageState extends State<UsersPage> {
     );
     if (confirm) {
       try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .delete();
+        await _firestoreService.deleteUser(userId);
         _showSuccessSnackBar('Pengguna berhasil dihapus secara permanen!');
       } catch (e) {
         _showErrorSnackBar('Gagal menghapus pengguna: $e');
@@ -42,10 +51,7 @@ class _UsersPageState extends State<UsersPage> {
     );
     if (confirm) {
       try {
-        await FirebaseFirestore.instance
-            .collection('stations')
-            .doc(stationId)
-            .delete();
+        await _firestoreService.deleteStation(stationId);
         _showSuccessSnackBar('Game Station berhasil dihapus secara permanen!');
       } catch (e) {
         _showErrorSnackBar('Gagal menghapus stasiun game: $e');
@@ -122,134 +128,139 @@ class _UsersPageState extends State<UsersPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Halaman ini menggabungkan pencarian, filter tab, dan daftar hasil.
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 430),
-        child: Column(
-          children: [
-            // Kolom Pencarian
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-              child: TextField(
-                onChanged: (val) {
-                  setState(() {
-                    _userSearchQuery = val.trim().toLowerCase();
-                  });
-                },
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Cari nama atau lokasi station...',
-                  hintStyle: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 13,
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.search_rounded,
-                    color: Color(0xFF64748B),
-                  ),
-                  fillColor: const Color(0xFF1E293B).withValues(alpha: 0.3),
-                  filled: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                      color: const Color(0xFF334155).withValues(alpha: 0.3),
+    // Konten halaman
+    return SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 430),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+                child: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.secondaryDark.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                    border: Border.all(
+                      color: AppColors.white.withValues(alpha: 0.08),
+                      width: 1.1,
                     ),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                      color: const Color(0xFF334155).withValues(alpha: 0.3),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF22D3EE),
-                      width: 1.2,
+                  child: TextField(
+                    controller: _searchController,
+                    style: AppTextStyle.body2.copyWith(color: AppColors.white),
+                    onChanged: (val) {
+                      setState(() {
+                        _userSearchQuery = val.trim().toLowerCase();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Cari nama, email, atau nama station...',
+                      hintStyle: AppTextStyle.body3.copyWith(
+                        color: AppColors.softGray,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: AppColors.softGray,
+                        size: 20,
+                      ),
+                      suffixIcon: _userSearchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: AppColors.softGray,
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _userSearchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
               ),
-            ),
 
-            // Stream utama untuk user dan station agar daftar selalu terbaru.
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .snapshots(),
-                builder: (context, usersSnapshot) {
-                  return StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('stations')
-                        .snapshots(),
-                    builder: (context, stationsSnapshot) {
-                      final int totalUsers = usersSnapshot.hasData
-                          ? usersSnapshot.data!.docs
-                                .where((doc) => doc.get('role') == 'user')
-                                .length
-                          : 0;
-                      final int totalStations = stationsSnapshot.hasData
-                          ? stationsSnapshot.data!.docs
-                                .where(
-                                  (doc) =>
-                                      doc.get('statusVerifikasi') == 'verified',
-                                )
-                                .length
-                          : 0;
+              // Stream utama untuk user dan station agar daftar selalu terbaru.
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _firestoreService.getUsersStream(),
+                  builder: (context, usersSnapshot) {
+                    return StreamBuilder<QuerySnapshot>(
+                      stream: _firestoreService.getStationsStream(),
+                      builder: (context, stationsSnapshot) {
+                        final int totalUsers = usersSnapshot.hasData
+                            ? usersSnapshot.data!.docs
+                                  .where((doc) => doc.get('role') == 'user')
+                                  .length
+                            : 0;
+                        final int totalStations = stationsSnapshot.hasData
+                            ? stationsSnapshot.data!.docs
+                                  .where(
+                                    (doc) =>
+                                        doc.get('statusVerifikasi') ==
+                                        'verified',
+                                  )
+                                  .length
+                            : 0;
 
-                      return Column(
-                        children: [
-                          // Tab Navigasi Kapsul
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 8,
-                            ),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              physics: const BouncingScrollPhysics(),
-                              child: Row(
-                                children: [
-                                  _buildTabCapsule(
-                                    0,
-                                    'Semua Users',
-                                    isActive: _activeTab == 0,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _buildTabCapsule(
-                                    1,
-                                    'Pengguna ($totalUsers)',
-                                    isActive: _activeTab == 1,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _buildTabCapsule(
-                                    2,
-                                    'Game Station ($totalStations)',
-                                    isActive: _activeTab == 2,
-                                  ),
-                                ],
+                        return Column(
+                          children: [
+                            // Tab Navigasi Kapsul
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 8,
+                              ),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                child: Row(
+                                  children: [
+                                    _buildTabCapsule(
+                                      0,
+                                      'Semua Users',
+                                      isActive: _activeTab == 0,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _buildTabCapsule(
+                                      1,
+                                      'Pengguna ($totalUsers)',
+                                      isActive: _activeTab == 1,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _buildTabCapsule(
+                                      2,
+                                      'Game Station ($totalStations)',
+                                      isActive: _activeTab == 2,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
 
-                          // Konten List Pengguna & Game Station
-                          Expanded(
-                            child: _buildListContent(
-                              usersSnapshot,
-                              stationsSnapshot,
+                            // Konten List Pengguna & Game Station
+                            Expanded(
+                              child: _buildListContent(
+                                usersSnapshot,
+                                stationsSnapshot,
+                              ),
                             ),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                },
+                          ],
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -260,7 +271,9 @@ class _UsersPageState extends State<UsersPage> {
     return GestureDetector(
       onTap: () => setState(() => _activeTab = index),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isActive
               ? Colors.transparent
@@ -273,17 +286,18 @@ class _UsersPageState extends State<UsersPage> {
                 )
               : null,
           borderRadius: BorderRadius.circular(24),
-          border: isActive
-              ? null
-              : Border.all(
-                  color: const Color(0xFF334155).withValues(alpha: 0.3),
-                ),
+          border: Border.all(
+            color: isActive
+                ? const Color(0xFF22D3EE)
+                : const Color(0xFF334155).withValues(alpha: 0.3),
+            width: isActive ? 1.5 : 1.0,
+          ),
         ),
         child: Text(
           title,
           style: TextStyle(
             color: isActive ? Colors.white : const Color(0xFF94A3B8),
-            fontWeight: FontWeight.bold,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
             fontSize: 12,
           ),
         ),
@@ -342,11 +356,19 @@ class _UsersPageState extends State<UsersPage> {
     }
 
     if (items.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.search_off_rounded,
-        title: 'Tidak Ada Data',
-        subtitle: 'Tidak ada data pengguna atau stasiun yang cocok.',
-      );
+      if (_userSearchQuery.isNotEmpty) {
+        return _buildEmptyState(
+          icon: Icons.search_off_rounded,
+          title: 'Tidak ditemukan',
+          subtitle: 'Silakan ubah kata kunci pencarian Anda.',
+        );
+      } else {
+        return _buildEmptyState(
+          icon: Icons.people_outline_rounded,
+          title: 'Tidak Ada Data',
+          subtitle: 'Belum ada data pengguna atau stasiun yang terdaftar.',
+        );
+      }
     }
 
     // Urutkan item agar Game Station tampil terlebih dahulu
@@ -762,11 +784,15 @@ class _UsersPageState extends State<UsersPage> {
     required String title,
     required String subtitle,
   }) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
+    // Menggunakan top alignment dan scrollable view dengan top padding
+    // agar layout tetap stabil dan tidak terdorong/jumping saat keyboard muncul.
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.only(top: 120, left: 40, right: 40, bottom: 24),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
@@ -779,6 +805,7 @@ class _UsersPageState extends State<UsersPage> {
             const SizedBox(height: 18),
             Text(
               title,
+              textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,

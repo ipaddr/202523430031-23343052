@@ -1,6 +1,10 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../services/firestore_service.dart';
+import '../../styles/app_colors.dart';
+import '../../styles/app_textstyle.dart';
+import '../../styles/app_theme.dart';
 import 'verify_detail_page.dart';
 
 // Halaman daftar verifikasi untuk meninjau pengajuan game station.
@@ -12,7 +16,19 @@ class VerifyPage extends StatefulWidget {
 }
 
 class _VerifyPageState extends State<VerifyPage> {
+  final FirestoreService _firestoreService = FirestoreService();
+
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  // Tab Status: 0 = Semua, 1 = Menunggu, 2 = Selesai
   int _selectedTab = 0;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   // Setujui game station dan update status terkait di Firestore.
   Future<void> _approveStation(
@@ -22,16 +38,7 @@ class _VerifyPageState extends State<VerifyPage> {
     String name,
   ) async {
     try {
-      final db = FirebaseFirestore.instance;
-      final batch = db.batch();
-
-      batch.update(db.collection('stations').doc(stationId), {
-        'statusVerifikasi': 'verified',
-      });
-
-      batch.update(db.collection('users').doc(ownerId), {'status': 'active'});
-
-      await batch.commit();
+      await _firestoreService.verifyStation(stationId, ownerId, 'verified');
 
       if (!context.mounted) {
         return;
@@ -73,10 +80,7 @@ class _VerifyPageState extends State<VerifyPage> {
     String name,
   ) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('stations')
-          .doc(stationId)
-          .update({'statusVerifikasi': 'rejected'});
+      await _firestoreService.rejectStation(stationId);
 
       if (!context.mounted) {
         return;
@@ -113,59 +117,101 @@ class _VerifyPageState extends State<VerifyPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Layout utama terdiri dari tab status dan daftar pengajuan.
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 430),
-        child: Column(
-          children: [
-            _buildTabBar(),
-            Expanded(child: _buildList()),
-          ],
+    // Konten halaman
+    return SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 430),
+          child: Column(
+            children: [
+              _buildSearchBar(context),
+              _buildTabBar(),
+              Expanded(child: _buildList()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: AppColors.secondaryDark.withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+          border: Border.all(
+            color: AppColors.white.withValues(alpha: 0.08),
+            width: 1.1,
+          ),
+        ),
+        child: TextField(
+          controller: _searchController,
+          style: AppTextStyle.body2.copyWith(color: AppColors.white),
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value.trim().toLowerCase();
+            });
+          },
+          decoration: InputDecoration(
+            hintText: 'Cari nama station, pemilik, email, nomor HP...',
+            hintStyle: AppTextStyle.body3.copyWith(color: AppColors.softGray),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: AppColors.softGray,
+              size: 20,
+            ),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.softGray,
+                      size: 18,
+                    ),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {
+                        _searchQuery = '';
+                      });
+                    },
+                  )
+                : null,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildTabBar() {
-    // Tab bar memisahkan pengajuan menunggu dan riwayat selesai.
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
         children: [
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('stations')
-                .where('statusVerifikasi', isEqualTo: 'pending')
-                .snapshots(),
-            builder: (context, snapshot) {
-              int count = snapshot.hasData ? snapshot.data!.docs.length : 0;
-              return _buildTabButton(
-                title: count > 0 ? 'Menunggu ($count)' : 'Menunggu',
-                index: 0,
-              );
-            },
-          ),
-          const SizedBox(width: 12),
-          _buildTabButton(title: 'Selesai', index: 1),
+          Expanded(child: _buildTabCapsule(0, 'Semua')),
+          const SizedBox(width: 8),
+          Expanded(child: _buildTabCapsule(1, 'Menunggu')),
+          const SizedBox(width: 8),
+          Expanded(child: _buildTabCapsule(2, 'Selesai')),
         ],
       ),
     );
   }
 
-  Widget _buildTabButton({required String title, required int index}) {
-    // Tombol tab kecil untuk mengganti daftar yang sedang ditampilkan.
+  Widget _buildTabCapsule(int index, String title) {
     final bool isActive = _selectedTab == index;
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTab = index;
-        });
-      },
+      onTap: () => setState(() => _selectedTab = index),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        height: 38,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isActive ? Colors.transparent : const Color(0xFF141B31),
+          color: isActive
+              ? Colors.transparent
+              : const Color(0xFF131722).withValues(alpha: 0.5),
           gradient: isActive
               ? const LinearGradient(
                   colors: [Color(0xFF22D3EE), Color(0xFFC084FC)],
@@ -174,14 +220,19 @@ class _VerifyPageState extends State<VerifyPage> {
                 )
               : null,
           borderRadius: BorderRadius.circular(24),
-          border: isActive ? null : Border.all(color: const Color(0xFF1E293B)),
+          border: Border.all(
+            color: isActive
+                ? const Color(0xFF22D3EE)
+                : const Color(0xFF334155).withValues(alpha: 0.3),
+            width: isActive ? 1.5 : 1.0,
+          ),
         ),
         child: Text(
           title,
           style: TextStyle(
             color: isActive ? Colors.white : const Color(0xFF94A3B8),
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+            fontSize: 12,
           ),
         ),
       ),
@@ -189,19 +240,8 @@ class _VerifyPageState extends State<VerifyPage> {
   }
 
   Widget _buildList() {
-    // Query berubah sesuai tab aktif agar daftar tetap fokus.
-    Query query = FirebaseFirestore.instance.collection('stations');
-    if (_selectedTab == 0) {
-      query = query.where('statusVerifikasi', isEqualTo: 'pending');
-    } else {
-      query = query.where(
-        'statusVerifikasi',
-        whereIn: ['verified', 'rejected'],
-      );
-    }
-
     return StreamBuilder<QuerySnapshot>(
-      stream: query.snapshots(),
+      stream: _firestoreService.getStationsStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -209,25 +249,87 @@ class _VerifyPageState extends State<VerifyPage> {
           );
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (snapshot.hasError) {
           return _buildEmptyState(
-            icon: Icons.fact_check_outlined,
-            title: _selectedTab == 0
-                ? 'Tidak Ada Pengajuan'
-                : 'Belum Ada Riwayat',
-            subtitle: _selectedTab == 0
-                ? 'Semua pengajuan pendaftaran mitra game station saat ini telah diverifikasi.'
-                : 'Belum ada pendaftaran yang selesai diverifikasi.',
+            icon: Icons.error_outline_rounded,
+            title: 'Terjadi Kesalahan',
+            subtitle: 'Gagal memuat data pengajuan game station dari server.',
           );
         }
 
-        final stations = snapshot.data!.docs;
+        final docs = snapshot.data?.docs ?? [];
+
+        if (docs.isEmpty) {
+          return _buildEmptyState(
+            icon: Icons.fact_check_outlined,
+            title: 'Tidak Ada Pengajuan',
+            subtitle:
+                'Semua pengajuan pendaftaran mitra game station saat ini telah diverifikasi.',
+          );
+        }
+
+        // Filter data secara dinamis
+        final filteredDocs = docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+
+          // Search matches
+          final String name = (data['namaStation'] ?? '')
+              .toString()
+              .toLowerCase();
+          final String ownerName = (data['namaOwner'] ?? '')
+              .toString()
+              .toLowerCase();
+          final String email = (data['emailOwner'] ?? '')
+              .toString()
+              .toLowerCase();
+          final String phone = (data['noHpOwner'] ?? data['noHp'] ?? '')
+              .toString()
+              .toLowerCase();
+
+          final matchesSearch =
+              name.contains(_searchQuery) ||
+              ownerName.contains(_searchQuery) ||
+              email.contains(_searchQuery) ||
+              phone.contains(_searchQuery);
+
+          // Status matches based on selected tab
+          final String status = data['statusVerifikasi'] ?? 'pending';
+          bool matchesStatus = true;
+          if (_selectedTab == 1) {
+            matchesStatus = status == 'pending';
+          } else if (_selectedTab == 2) {
+            matchesStatus = status == 'verified' || status == 'rejected';
+          }
+
+          return matchesSearch && matchesStatus;
+        }).toList();
+
+        // Urutkan data secara dinamis (Terbaru sebagai default)
+        filteredDocs.sort((a, b) {
+          final Map<String, dynamic> dataA = a.data() as Map<String, dynamic>;
+          final Map<String, dynamic> dataB = b.data() as Map<String, dynamic>;
+          final Timestamp? timeA = dataA['createdAt'] as Timestamp?;
+          final Timestamp? timeB = dataB['createdAt'] as Timestamp?;
+          if (timeA == null && timeB == null) return 0;
+          if (timeA == null) return 1;
+          if (timeB == null) return -1;
+          return timeB.compareTo(timeA);
+        });
+
+        if (filteredDocs.isEmpty) {
+          return _buildEmptyState(
+            icon: Icons.search_off_rounded,
+            title: 'Tidak ditemukan',
+            subtitle: 'Silakan ubah kata kunci pencarian Anda.',
+          );
+        }
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          itemCount: stations.length,
+          physics: const BouncingScrollPhysics(),
+          itemCount: filteredDocs.length,
           itemBuilder: (context, index) {
-            final doc = stations[index];
+            final doc = filteredDocs[index];
             final data = doc.data() as Map<String, dynamic>;
             final String stationId = doc.id;
             final String ownerId = data['ownerId'] ?? '';
@@ -398,38 +500,41 @@ class _VerifyPageState extends State<VerifyPage> {
             const SizedBox(height: 12),
           ],
 
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => VerifyDetailPage(
-                      stationId: stationId,
-                      ownerId: ownerId,
-                      data: data,
-                      photos: photos,
-                      documents: data['buktiLegalitas'] ?? [],
-                      onApprove: _approveStation,
-                      onReject: _rejectStation,
-                    ),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VerifyDetailPage(
+                    stationId: stationId,
+                    ownerId: ownerId,
+                    data: data,
+                    photos: photos,
+                    documents: data['buktiLegalitas'] ?? [],
+                    onApprove: _approveStation,
+                    onReject: _rejectStation,
                   ),
-                );
-              },
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF1E293B)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+              );
+            },
+            child: Container(
+              width: double.infinity,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B).withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF334155).withValues(alpha: 0.4),
+                ),
               ),
-              child: const Text(
-                'Lihat Detail',
-                style: TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              child: const Center(
+                child: Text(
+                  'Lihat Detail',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -444,12 +549,20 @@ class _VerifyPageState extends State<VerifyPage> {
     required String title,
     required String subtitle,
   }) {
-    // Empty state muncul saat tidak ada data untuk tab aktif.
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
+    // Menggunakan top alignment dan scrollable view dengan top padding
+    // agar layout tetap stabil dan tidak terdorong/jumping saat keyboard muncul.
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.only(
+          top: 120,
+          left: 40,
+          right: 40,
+          bottom: 24,
+        ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
@@ -462,6 +575,7 @@ class _VerifyPageState extends State<VerifyPage> {
             const SizedBox(height: 18),
             Text(
               title,
+              textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
