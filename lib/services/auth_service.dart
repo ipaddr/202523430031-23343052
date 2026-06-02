@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -65,6 +66,39 @@ class AuthService {
     return await _auth.signInWithCredential(credential);
   }
 
+  /// Membangun Google OAuthCredential dari GoogleSignInAccount tanpa
+  /// langsung sign in ke Firebase Auth.
+  Future<OAuthCredential> buildGoogleCredential(
+    GoogleSignInAccount googleUser,
+  ) async {
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+    return GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+  }
+
+  /// Link Google credential ke akun yang sedang aktif (sudah sign in).
+  /// Digunakan saat user sudah login email+password dan ingin tambah Google.
+  Future<void> linkGoogleToCurrentUser(OAuthCredential googleCredential) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'Tidak ada user yang sedang login.',
+      );
+    }
+    try {
+      await user.linkWithCredential(googleCredential);
+    } on FirebaseAuthException catch (e) {
+      // provider-already-linked: Google sudah ter-link → tidak masalah
+      // credential-already-in-use: credential Google ini sudah dipakai akun lain
+      if (e.code == 'provider-already-linked') return;
+      rethrow;
+    }
+  }
+
   // Mendaftar akun baru dengan email dan password
   Future<UserCredential> createUserWithEmailAndPassword({
     required String email,
@@ -92,9 +126,20 @@ class AuthService {
     return await _auth.signInWithCredential(credential);
   }
 
-  // Keluar dari sesi masuk saat ini
+  // Keluar dari sesi masuk saat ini (Firebase + Google Sign-In).
   Future<void> signOut() async {
     await _auth.signOut();
     await _googleSignIn.signOut();
+  }
+
+  // Logout lengkap: signOut + hapus flag onboarding di SharedPreferences.
+  // Gunakan method ini dari semua titik logout agar alur startup konsisten:
+  // Splash → Onboarding → Login.
+  Future<void> logout() async {
+    await signOut();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('seenOnboarding');
+    } catch (_) {}
   }
 }

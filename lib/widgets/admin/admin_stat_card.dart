@@ -184,7 +184,7 @@ class RevenueCard extends StatelessWidget {
   const RevenueCard({
     super.key,
     required this.amount,
-    this.title = 'Total Pemasukan Bulan Ini',
+    this.title = 'Total Pemasukan',
   });
 
   String _formatRupiah(int value) {

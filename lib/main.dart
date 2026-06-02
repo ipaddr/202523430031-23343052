@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gamezone/firebase_options.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/pages/start/splash_page.dart';
@@ -16,6 +17,8 @@ import 'package:gamezone/pages/edit_profile_page.dart';
 import 'package:gamezone/pages/shared/station_detail_page.dart';
 import 'package:gamezone/pages/shared/room_detail_page.dart'
     show SharedRoomDetailPage;
+import 'package:gamezone/pages/user/booking_form_page.dart';
+import 'package:gamezone/pages/user/payment_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 // Konfigurasi system UI global.
@@ -32,6 +35,13 @@ const SystemUiOverlayStyle _gameZoneSystemUiStyle = SystemUiOverlayStyle(
 // Titik masuk aplikasi dan peta route utama GameZone.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables (.env)
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('Error loading .env file: $e');
+  }
 
   // Konfigurasi edge-to-edge Android.
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -69,6 +79,7 @@ class MyApp extends StatelessWidget {
       },
       home: const SplashPage(),
       routes: {
+        '/splash': (context) => const SplashPage(),
         '/onboarding': (context) => const OnboardingPage(),
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
@@ -82,6 +93,8 @@ class MyApp extends StatelessWidget {
         '/edit-profile': (context) => const EditProfilePage(),
         '/station-detail': (context) => const StationDetailPage(),
         '/room-detail': (context) => const SharedRoomDetailPage(),
+        '/booking-form': (context) => const BookingFormPage(),
+        '/payment': (context) => const PaymentPage(),
       },
     );
   }

@@ -359,11 +359,15 @@ class _RegisterPageState extends State<RegisterPage> {
       case 'invalid-email':
         return 'Format email tidak valid.';
       case 'email-already-in-use':
-        return 'Email sudah terdaftar.';
+        return 'Email sudah terdaftar. Coba login langsung atau gunakan "Lupa Password".';
+      case 'email-google-no-password':
+        // Kasus khusus: email terdaftar via Google, belum ada password provider
+        return 'Email ini terdaftar via Google. Silakan login menggunakan tombol Google, '
+            'atau gunakan "Lupa Password" di halaman login untuk mengatur password.';
       case 'weak-password':
-        return 'Password terlalu lemah.';
+        return 'Password terlalu lemah. Gunakan minimal 6 karakter.';
       case 'operation-not-allowed':
-        return 'Registrasi belum diaktifkan.';
+        return 'Registrasi belum diaktifkan. Hubungi administrator.';
       default:
         return 'Registrasi gagal. Periksa kembali data yang diisi.';
     }

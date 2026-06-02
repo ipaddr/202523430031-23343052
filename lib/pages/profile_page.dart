@@ -6,16 +6,23 @@ import '../services/firestore_service.dart';
 import '../styles/app_colors.dart';
 import '../styles/app_textstyle.dart';
 import '../widgets/background.dart';
+import 'package:gamezone/widgets/common/custom_image_loader.dart';
 
 // Halaman profil untuk melihat data akun aktif dan melakukan logout.
 class ProfilePage extends StatefulWidget {
   final bool isNestedTab;
   final VoidCallback? onProfileUpdated;
 
+  /// Callback dipanggil saat user konfirmasi logout dari tab profil.
+  /// Dashboard menyetel _isLoggingOut sebelum logout dieksekusi agar
+  /// tidak ada double-navigation atau flash ke tab lain.
+  final Future<void> Function()? onLogoutRequested;
+
   const ProfilePage({
     super.key,
     this.isNestedTab = false,
     this.onProfileUpdated,
+    this.onLogoutRequested,
   });
 
   @override
@@ -26,20 +33,23 @@ class _ProfilePageState extends State<ProfilePage> {
   final AuthService _authService = AuthService();
   final FirestoreService _firestoreService = FirestoreService();
 
-  Future<void> _logout(BuildContext context) async {
-    // Logout lalu bersihkan stack navigasi.
-    await _authService.signOut();
-    if (!context.mounted) {
-      return;
+  Future<void> _logout(NavigatorState navigator) async {
+    // Sign out terlebih dahulu.
+    await _authService.logout();
+    // Navigasi ke splash — hanya jika tidak ada dashboard yang mengelola navigasi.
+    if (navigator.mounted) {
+      navigator.pushNamedAndRemoveUntil('/splash', (route) => false);
     }
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
   // Dialog konfirmasi logout agar seragam di semua role
   Future<void> _showLogoutConfirmationDialog(BuildContext context) async {
+    // Ambil navigator dari page context SEBELUM dialog dibuka.
+    final navigator = Navigator.of(context, rootNavigator: true);
+
     final bool? confirm = await showDialog<bool>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return Theme(
           data: ThemeData.dark(),
           child: AlertDialog(
@@ -60,14 +70,14 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context, false),
+                onPressed: () => Navigator.pop(dialogContext, false),
                 child: const Text(
                   'Batal',
                   style: TextStyle(color: Color(0xFF64748B)),
                 ),
               ),
               ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () => Navigator.pop(dialogContext, true),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEF4444),
                   foregroundColor: Colors.white,
@@ -86,8 +96,15 @@ class _ProfilePageState extends State<ProfilePage> {
       },
     );
 
-    if (confirm == true && context.mounted) {
-      await _logout(context);
+    if (confirm == true) {
+      // Jika dashboard menyediakan callback, delegasikan seluruh proses logout
+      // ke dashboard agar ia bisa set _isLoggingOut sebelum signout — mencegah
+      // flash rebuild ke tab lain sebelum navigasi ke splash.
+      if (widget.onLogoutRequested != null) {
+        await widget.onLogoutRequested!();
+      } else {
+        await _logout(navigator);
+      }
     }
   }
 
@@ -395,10 +412,14 @@ class _ProfilePageState extends State<ProfilePage> {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1E293B).withValues(alpha: 0.6),
+                              color: const Color(
+                                0xFF1E293B,
+                              ).withValues(alpha: 0.6),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: const Color(0xFF22D3EE).withValues(alpha: 0.15),
+                                color: const Color(
+                                  0xFF22D3EE,
+                                ).withValues(alpha: 0.15),
                               ),
                             ),
                             child: const Icon(
@@ -413,8 +434,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           role == 'admin'
                               ? 'Profil Admin'
                               : (role == 'superadmin' || role == 'super_admin'
-                                  ? 'Profil Super Admin'
-                                  : 'Profil Pengguna'),
+                                    ? 'Profil Super Admin'
+                                    : 'Profil Pengguna'),
                           style: AppTextStyle.h3.copyWith(
                             color: AppColors.white,
                             fontSize: 22,
@@ -454,37 +475,7 @@ class _ProfilePageState extends State<ProfilePage> {
             Center(
               child: Stack(
                 children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: themeColor, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: themeColor.withValues(alpha: 0.25),
-                          blurRadius: 16,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                      color: const Color(0xFF11172A),
-                    ),
-                    child: avatarUrl.isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(50),
-                            child: Image.network(
-                              avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Icon(
-                                    Icons.person,
-                                    color: themeColor,
-                                    size: 50,
-                                  ),
-                            ),
-                          )
-                        : Icon(Icons.person, color: themeColor, size: 50),
-                  ),
+                  CustomUserAvatar(photoUrl: avatarUrl, size: 100),
                   Positioned(
                     bottom: 0,
                     right: 4,

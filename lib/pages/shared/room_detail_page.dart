@@ -267,15 +267,14 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
   }
 
   void _openBooking(Map<String, dynamic> unitData) {
-    // Placeholder: fitur booking akan diimplementasi di tab Booking user.
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppColors.accentBlue,
-        content: Text(
-          'Fitur booking segera hadir!',
-          style: AppTextStyle.body3.copyWith(color: AppColors.white),
-        ),
-      ),
+    Navigator.pushNamed(
+      context,
+      '/booking-form',
+      arguments: {
+        'unitId': _unitId,
+        'stationId': _stationId,
+        'unitData': unitData,
+      },
     );
   }
 
@@ -1013,23 +1012,13 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: AppTheme.shadowMedium,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.book_online_rounded,
-              color: AppColors.white,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Booking Sekarang',
-              style: AppTextStyle.buttonMedium.copyWith(
-                color: AppColors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+        child: Text(
+          'Booking Sekarang',
+          textAlign: TextAlign.center,
+          style: AppTextStyle.buttonMedium.copyWith(
+            color: AppColors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );

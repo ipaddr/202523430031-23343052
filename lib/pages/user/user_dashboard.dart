@@ -1,14 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
+import '../../services/news_service.dart';
+import '../../models/news_model.dart';
 import '../../styles/app_colors.dart';
 import '../../styles/app_textstyle.dart';
-import '../../styles/app_theme.dart';
+import 'package:gamezone/styles/app_theme.dart';
+import 'package:gamezone/widgets/common/custom_empty_state.dart';
+import 'package:gamezone/widgets/common/custom_notification_button.dart';
+import 'package:gamezone/widgets/common/custom_image_loader.dart';
 import '../../widgets/background.dart';
 import '../profile_page.dart';
+import 'ai_page.dart';
+import 'booking_page.dart';
+import 'booking_history_page.dart';
 
 class UserDashboardPage extends StatefulWidget {
   const UserDashboardPage({super.key});
@@ -20,16 +29,84 @@ class UserDashboardPage extends StatefulWidget {
 class _UserDashboardPageState extends State<UserDashboardPage> {
   final AuthService _authService = AuthService();
   final FirestoreService _firestoreService = FirestoreService();
+  final NewsService _newsService = NewsService();
+
+  // FIX: Future disimpan sekali di initState, tidak dibuat ulang tiap rebuild.
+  // Kalau dibuat langsung di build() / _buildBerandaTab(), Flutter akan
+  // membuat Future baru setiap rebuild (dipicu stream Firestore) sehingga
+  // FutureBuilder tidak pernah settle dan berita tidak tampil pada release build.
+  late Future<List<NewsModel>> _newsFuture;
 
   int _activeTabIndex = 0;
+  // Flag untuk mencegah double-navigation saat proses logout sedang berjalan.
+  bool _isLoggingOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Inisialisasi sekali — Future ini tidak akan di-recreate selama widget hidup.
+    _newsFuture = _newsService.getLatestGamingNews();
+    debugPrint('================ GNEWS FUTURE INIT ================');
+    debugPrint('GNEWS_API_KEY Loaded: Yes');
+    debugPrint(
+      'Future dibuat di initState — tidak akan di-recreate saat rebuild.',
+    );
+    debugPrint('====================================================');
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final Object? args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map && args.containsKey('initialTabIndex')) {
+      final int? index = args['initialTabIndex'] as int?;
+      if (index != null) {
+        _activeTabIndex = index;
+      }
+    }
+  }
 
   void _refreshUserData() {
     setState(() {});
   }
 
+  /// Logout yang diinisiasi dari tab profil.
+  /// Set _isLoggingOut = true SEBELUM signout agar build() tidak trigger
+  /// navigasi ganda saat currentUser menjadi null.
+  Future<void> _handleLogout() async {
+    setState(() => _isLoggingOut = true);
+    await _authService.logout();
+    if (!mounted) return;
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).pushNamedAndRemoveUntil('/splash', (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = _authService.getCurrentUser();
+
+    if (currentUser == null) {
+      // Guard: hanya jalankan sekali. Jika ProfilePage sudah memanggil logout
+      // dan navigasi ke /splash, jangan panggil lagi dari sini.
+      if (!_isLoggingOut) {
+        _isLoggingOut = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(
+            context,
+            rootNavigator: true,
+          ).pushNamedAndRemoveUntil('/splash', (route) => false);
+        });
+      }
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF22D3EE)),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -38,9 +115,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         child: SafeArea(
           bottom: false,
           child: StreamBuilder<DocumentSnapshot>(
-            stream: currentUser != null
-                ? _firestoreService.getUserStream(currentUser.uid)
-                : const Stream.empty(),
+            stream: _firestoreService.getUserStream(currentUser.uid),
             builder: (context, userSnapshot) {
               Map<String, dynamic> userData = {};
               if (userSnapshot.hasData && userSnapshot.data!.exists) {
@@ -50,12 +125,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               final String userName =
                   userData['nama'] ??
                   userData['name'] ??
-                  currentUser?.displayName ??
                   'Gamers';
               final String avatarUrl =
                   userData['foto'] ??
                   userData['photoUrl'] ??
-                  currentUser?.photoURL ??
                   '';
 
               return Center(
@@ -84,8 +157,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                       ),
 
                       // Bottom Navigation Bar
-                      if (MediaQuery.of(context).viewInsets.bottom == 0)
-                        _buildUserBottomNavBar(),
+                      _buildUserBottomNavBar(),
                     ],
                   ),
                 ),
@@ -107,28 +179,17 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       case 0:
         return _buildBerandaTab(userName: userName, avatarUrl: avatarUrl);
       case 1:
-        return _buildPlaceholderTab(
-          'Booking Station',
-          Icons.book_online_rounded,
-          'Fitur booking station akan segera hadir untuk mempermudah reservasi Anda.',
-        );
+        return const BookingPage(key: ValueKey('booking-tab'));
       case 2:
-        return _buildPlaceholderTab(
-          'Gemini AI Assistant',
-          Icons.psychology_rounded,
-          'Fitur asisten AI akan segera hadir untuk merekomendasikan game terbaik untuk Anda.',
-        );
+        return const AiPage(key: ValueKey('ai-tab'));
       case 3:
-        return _buildPlaceholderTab(
-          'Riwayat Transaksi',
-          Icons.history_rounded,
-          'Riwayat booking dan rental game station Anda akan muncul di halaman ini.',
-        );
+        return const BookingHistoryPage(key: ValueKey('history-tab'));
       case 4:
         return ProfilePage(
           key: const ValueKey('profile-tab'),
           isNestedTab: true,
           onProfileUpdated: _refreshUserData,
+          onLogoutRequested: _handleLogout,
         );
       default:
         return _buildBerandaTab(userName: userName, avatarUrl: avatarUrl);
@@ -143,8 +204,34 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
-        // Hero Banner Berita Game
-        _buildHeroNewsBanner(),
+        // Hero Banner Berita Game Carousel
+        FutureBuilder<List<NewsModel>>(
+          future: _newsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return _buildNewsLoadingCard();
+            }
+
+            if (snapshot.hasError ||
+                !snapshot.hasData ||
+                snapshot.data!.isEmpty) {
+              return _buildNewsErrorCard();
+            }
+
+            final List<NewsModel> newsList = snapshot.data!;
+            return SizedBox(
+              height: 160,
+              child: PageView.builder(
+                itemCount: newsList.length,
+                physics: const BouncingScrollPhysics(),
+                itemBuilder: (context, index) {
+                  final NewsModel news = newsList[index];
+                  return _buildHeroNewsBanner(news);
+                },
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 28),
 
         // Game Station Populer
@@ -169,54 +256,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             child: Row(
               children: [
                 // Foto Profil User (Samakan dengan style Admin)
-                Container(
-                  width: 52,
-                  height: 52,
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF22D3EE), Color(0xFFC084FC)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF22D3EE).withValues(alpha: 0.25),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF0F172A),
-                      border: Border.all(
-                        color: const Color(0xFF22D3EE).withValues(alpha: 0.5),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: ClipOval(
-                      child: avatarUrl.isNotEmpty
-                          ? Image.network(
-                              avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                    Icons.person_rounded,
-                                    color: Color(0xFF94A3B8),
-                                    size: 24,
-                                  ),
-                            )
-                          : const Icon(
-                              Icons.person_rounded,
-                              color: Color(0xFF94A3B8),
-                              size: 24,
-                            ),
-                    ),
-                  ),
-                ),
+                CustomUserAvatar(photoUrl: avatarUrl, size: 52),
                 const SizedBox(width: 12),
                 // Nama User
                 Expanded(
@@ -251,43 +291,14 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             ),
           ),
           const SizedBox(width: 12),
-          // Tombol Notifikasi
-          Material(
-            color: const Color(0xFF1E293B).withValues(alpha: 0.6),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(
-                color: const Color(0xFF22D3EE).withValues(alpha: 0.15),
-                width: 1,
-              ),
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () {
-                if (currentUser != null) {
-                  _showUserNotifications(context, currentUser);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Silakan login terlebih dahulu untuk melihat notifikasi.',
-                      ),
-                      backgroundColor: AppColors.errorRed,
-                    ),
-                  );
-                }
-              },
-              child: Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Color(0xFF94A3B8),
-                  size: 22,
-                ),
-              ),
-            ),
+          // Tombol Notifikasi — stream Firestore, dot indicator seperti Admin
+          _UserNotificationButton(
+            currentUser: currentUser,
+            onPressed: () {
+              if (currentUser != null) {
+                _showUserNotifications(context, currentUser);
+              }
+            },
           ),
         ],
       ),
@@ -295,49 +306,151 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   }
 
   // Hero Banner Berita Game Widget
-  Widget _buildHeroNewsBanner() {
-    // Persiapan API nanti: ambil headline pertama.
-    // Sementara menggunakan data statis.
-    final String title = 'Berita Terkini';
-    final String description =
-        'Ikuti perkembangan dunia game, esports, turnamen, dan teknologi gaming terbaru.';
-    const String? imageUrl = null; // Bisa ditambahkan foto di masa depan
+  Widget _buildHeroNewsBanner(NewsModel news) {
+    final String title = news.title.isNotEmpty ? news.title : 'Berita Terkini';
+    final String description = news.description.isNotEmpty
+        ? news.description
+        : 'Ikuti perkembangan dunia game, esports, dan teknologi gaming terbaru.';
+    final String? imageUrl = news.image.isNotEmpty ? news.image : null;
 
-    return Container(
-      width: double.infinity,
-      height: 160,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF00F2FE), Color(0xFF4FACFE), Color(0xFF7028FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4FACFE).withValues(alpha: 0.3),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+    debugPrint('GNews banner — imageUrl: ${imageUrl ?? "null (no image)"}');
+
+    return GestureDetector(
+      onTap: () async {
+        if (news.url.isEmpty) return;
+        try {
+          final Uri uri = Uri.parse(news.url);
+          if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+            await launchUrl(uri);
+          }
+        } catch (_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Gagal membuka berita.'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+        }
+      },
+      // Container luar: menentukan ukuran card (160px) + gradient background.
+      // Gradient ini juga berfungsi sebagai fallback saat gambar belum/gagal muat.
+      child: Container(
+        width: double.infinity,
+        height: 160,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF00F2FE), Color(0xFF4FACFE), Color(0xFF7028FF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            // Decorative background / API Image overlay
-            if (imageUrl != null)
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4FACFE).withValues(alpha: 0.3),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        // ClipRRect memotong konten agar tidak keluar dari radius card.
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              // ── Layer 1: Gambar GNews ──────────────────────────────────────
+              // non-Positioned di Stack → Stack pakai ukuran dari SizedBox ini.
+              // Kalau imageUrl null atau gambar gagal load, layer ini tidak
+              // menambah visual apapun — gradient Container parent tetap terlihat
+              // sebagai fallback yang sudah cukup menarik.
+              if (imageUrl != null)
+                SizedBox(
+                  width: double.infinity,
+                  height: 160,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      // Shimmer ringan saat loading
+                      return const SizedBox.shrink();
+                    },
+                    errorBuilder: (context, error, stack) {
+                      debugPrint('GNews image blocked/error: $imageUrl');
+                      // Fallback: jangan kosong — tampilkan dekorasi
+                      return Container(
+                        width: double.infinity,
+                        height: 160,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xFF0D1B4B),
+                              Color(0xFF1A1060),
+                              Color(0xFF0A2A4A),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            // Lingkaran dekoratif background
+                            Positioned(
+                              right: -40,
+                              top: -40,
+                              child: Container(
+                                width: 180,
+                                height: 180,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.04),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: -20,
+                              bottom: -20,
+                              child: Container(
+                                width: 120,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(
+                                    0xFF4FACFE,
+                                  ).withValues(alpha: 0.08),
+                                ),
+                              ),
+                            ),
+                            // Ikon sumber berita di tengah kanan
+                            Positioned(
+                              right: 20,
+                              top: 0,
+                              bottom: 0,
+                              child: Center(
+                                child: Icon(
+                                  Icons.article_rounded,
+                                  size: 72,
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+              // ── Layer 2: Overlay gelap (teks tetap terbaca) ───────────────
               Positioned.fill(
-                child: Image.network(imageUrl, fit: BoxFit.cover),
-              ),
-            if (imageUrl != null)
-              Positioned.fill(
-                child: Container(
+                child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.black.withValues(alpha: 0.1),
-                        Colors.black.withValues(alpha: 0.8),
+                        Colors.black.withValues(
+                          alpha: imageUrl != null ? 0.08 : 0.0,
+                        ),
+                        Colors.black.withValues(alpha: 0.70),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -345,86 +458,164 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   ),
                 ),
               ),
-            // Default decorative graphics
-            if (imageUrl == null)
+
+              // ── Layer 3: Dekorasi lingkaran kiri atas ────────────────────
               Positioned(
-                right: -20,
-                bottom: -20,
-                child: Icon(
-                  Icons.newspaper_rounded,
-                  size: 150,
-                  color: Colors.white.withValues(alpha: 0.12),
+                left: -30,
+                top: -30,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
                 ),
               ),
-            Positioned(
-              left: -30,
-              top: -30,
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.05),
+
+              // ── Layer 4: Ikon dekoratif kanan bawah (hanya tanpa gambar) ────
+              if (imageUrl == null)
+                Positioned(
+                  right: -20,
+                  bottom: -20,
+                  child: Icon(
+                    Icons.newspaper_rounded,
+                    size: 150,
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
                 ),
-              ),
-            ),
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Badge Berita Terkini / News
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'NEWS UPDATE',
-                      style: AppTextStyle.caption2.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
+
+              // ── Layer 5: Konten teks ──────────────────────────────────────
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Badge + Source
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'NEWS UPDATE',
+                              style: AppTextStyle.caption2.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                          if (news.source.isNotEmpty)
+                            Flexible(
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: Text(
+                                  news.source.toUpperCase(),
+                                  style: AppTextStyle.caption2.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.8,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          title,
-                          style: AppTextStyle.h3.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            height: 1.2,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+
+                      const Spacer(),
+
+                      // Judul berita
+                      Text(
+                        title,
+                        style: AppTextStyle.h3.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          height: 1.2,
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          description,
-                          style: AppTextStyle.body3.copyWith(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            height: 1.3,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 5),
+
+                      // Deskripsi
+                      Text(
+                        description,
+                        style: AppTextStyle.body3.copyWith(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          height: 1.3,
+                          fontSize: 12,
                         ),
-                      ],
-                    ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNewsLoadingCard() {
+    return Container(
+      width: double.infinity,
+      height: 160,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFF334155).withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(color: Color(0xFF22D3EE)),
+      ),
+    );
+  }
+
+  Widget _buildNewsErrorCard() {
+    return Container(
+      width: double.infinity,
+      height: 160,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: AppColors.errorRed.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              color: AppColors.errorRed,
+              size: 28,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Berita tidak tersedia saat ini',
+              style: AppTextStyle.body3.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -514,49 +705,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             });
 
             if (stations.isEmpty) {
-              return Container(
-                width: double.infinity,
-                height: 180,
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B).withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: const Color(0xFF334155).withValues(alpha: 0.5),
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.sports_esports_outlined,
-                        color: Color(0xFF22D3EE),
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Belum ada stasiun game',
-                      style: AppTextStyle.body1.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Belum ada stasiun game yang tersedia saat ini.',
-                      style: AppTextStyle.body3.copyWith(
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
+              return const CustomEmptyState(
+                icon: Icons.sports_esports_outlined,
+                title: 'Belum ada stasiun game',
+                subtitle: 'Belum ada stasiun game yang tersedia saat ini.',
               );
             }
 
@@ -758,6 +910,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
+
   // Placeholder Image Widget
   Widget _buildPlaceholderImage() {
     return Container(
@@ -820,8 +973,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection('bookings')
+                      .collection('notifications')
                       .where('userId', isEqualTo: currentUser.uid)
+                      .where('roleTarget', isEqualTo: 'user')
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
@@ -842,81 +996,58 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                       );
                     }
 
-                    final allBookings = snapshot.data?.docs ?? [];
+                    final allNotifs = snapshot.data?.docs ?? [];
 
-                    // Filter status pending, confirmed, completed, cancelled
-                    final List<DocumentSnapshot> filteredBookings = allBookings
-                        .where((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          final String status = (data['statusBooking'] ?? '')
-                              .toString()
-                              .toLowerCase();
-                          return status == 'confirmed' ||
-                              status == 'completed' ||
-                              status == 'cancelled';
-                        })
-                        .toList();
+                    final List<DocumentSnapshot> filteredNotifs = allNotifs.toList();
 
-                    filteredBookings.sort((a, b) {
+                    filteredNotifs.sort((a, b) {
                       final aData = a.data() as Map<String, dynamic>;
                       final bData = b.data() as Map<String, dynamic>;
-                      final Timestamp? aTime =
-                          (aData['updatedAt'] ?? aData['createdAt'])
-                              as Timestamp?;
-                      final Timestamp? bTime =
-                          (bData['updatedAt'] ?? bData['createdAt'])
-                              as Timestamp?;
+                      final Timestamp? aTime = aData['createdAt'] as Timestamp?;
+                      final Timestamp? bTime = bData['createdAt'] as Timestamp?;
                       final int aMillis = aTime?.millisecondsSinceEpoch ?? 0;
                       final int bMillis = bTime?.millisecondsSinceEpoch ?? 0;
                       return bMillis.compareTo(aMillis);
                     });
 
-                    if (filteredBookings.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'Belum ada notifikasi baru.',
-                          style: TextStyle(color: Color(0xFF64748B)),
-                        ),
+                    if (filteredNotifs.isEmpty) {
+                      return const CustomEmptyState(
+                        icon: Icons.notifications_none_rounded,
+                        title: 'Belum ada notifikasi baru.',
+                        subtitle:
+                            'Status real-time pemesanan game station Anda akan muncul di sini.',
                       );
                     }
 
                     return ListView.builder(
                       physics: const BouncingScrollPhysics(),
-                      itemCount: filteredBookings.length,
+                      itemCount: filteredNotifs.length,
                       itemBuilder: (context, index) {
                         final data =
-                            filteredBookings[index].data()
+                            filteredNotifs[index].data()
                                 as Map<String, dynamic>;
-                        final String status = (data['statusBooking'] ?? '')
-                            .toString()
-                            .toLowerCase();
-                        final String unitName =
-                            data['namaUnit']?.toString() ?? 'Room';
-                        final String stationName =
-                            data['namaStation']?.toString() ?? 'Game Station';
+                        final String title = data['title']?.toString() ?? 'Notifikasi';
+                        final String message = data['message']?.toString() ?? '';
+                        final String type = (data['type'] ?? '').toString();
 
-                        String title = '';
-                        String message = '';
                         Color statusColor = Colors.white;
                         IconData statusIcon = Icons.notifications_none_rounded;
 
-                        if (status == 'confirmed') {
-                          title = 'Booking Diterima';
-                          message =
-                              'Booking Anda telah dikonfirmasi oleh Game Station.';
+                        if (type.contains('confirmed') || type.contains('success')) {
                           statusColor = const Color(0xFF22D3EE);
                           statusIcon = Icons.check_circle_rounded;
-                        } else if (status == 'cancelled') {
-                          title = 'Booking Dibatalkan';
-                          message = 'Booking Anda dibatalkan oleh pengelola.';
+                        } else if (type.contains('cancelled') || type.contains('rejected') || type.contains('expired')) {
                           statusColor = const Color(0xFFEF4444);
                           statusIcon = Icons.cancel_rounded;
-                        } else if (status == 'completed') {
-                          title = 'Booking Selesai';
-                          message =
-                              'Terima kasih telah bermain.\nSilakan berikan rating dan review.';
+                        } else if (type.contains('checkin')) {
+                          statusColor = const Color(0xFF06B6D4);
+                          statusIcon = Icons.sports_esports_rounded;
+                        } else if (type.contains('completed')) {
                           statusColor = const Color(0xFF10B981);
                           statusIcon = Icons.stars_rounded;
+                        } else {
+                          statusColor = const Color(0xFFF59E0B);
+                          statusIcon = Icons.info_outline_rounded;
                         }
 
                         return Container(
@@ -970,15 +1101,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                                         height: 1.3,
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '$unitName - $stationName',
-                                      style: const TextStyle(
-                                        color: Color(0xFF64748B),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
                                   ],
                                 ),
                               ),
@@ -994,45 +1116,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           ),
         );
       },
-    );
-  }
-
-  // Placeholder untuk Tab Booking / AI / Riwayat
-  Widget _buildPlaceholderTab(String title, IconData icon, String description) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFF22D3EE).withValues(alpha: 0.2),
-                width: 1.5,
-              ),
-            ),
-            child: Icon(icon, color: const Color(0xFF22D3EE), size: 48),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            title,
-            style: AppTextStyle.h3.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            description,
-            style: AppTextStyle.body2.copyWith(color: const Color(0xFF94A3B8)),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
     );
   }
 
@@ -1136,6 +1219,98 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Tombol Notifikasi User ──────────────────────────────────────────────────
+// Mengikuti pola yang sama dengan _NotificationButton di admin_header.dart:
+// • Stream getUserStream → ambil lastOpenedNotifications
+// • Stream getUserBookingNotificationsStream → hitung notif belum dibaca
+// • Tampilkan dot indicator jika ada; simpan timestamp saat dibuka
+class _UserNotificationButton extends StatefulWidget {
+  final User? currentUser;
+  final VoidCallback onPressed;
+
+  const _UserNotificationButton({
+    required this.currentUser,
+    required this.onPressed,
+  });
+
+  @override
+  State<_UserNotificationButton> createState() =>
+      _UserNotificationButtonState();
+}
+
+class _UserNotificationButtonState extends State<_UserNotificationButton> {
+  DateTime? _localLastOpened;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.currentUser == null) {
+      return CustomNotificationButton(hasNotification: false, onTap: () {});
+    }
+
+    final FirestoreService firestoreService = FirestoreService();
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: firestoreService.getUserStream(widget.currentUser!.uid),
+      builder: (context, userSnap) {
+        Timestamp? lastOpened;
+        if (userSnap.hasData && userSnap.data!.exists) {
+          final userData = userSnap.data!.data() as Map<String, dynamic>;
+          lastOpened =
+              userData['lastOpenedBookingNotifications'] as Timestamp? ??
+              userData['lastOpenedNotifications'] as Timestamp?;
+        }
+
+        DateTime? compareTime = lastOpened?.toDate();
+        if (_localLastOpened != null) {
+          if (compareTime == null || _localLastOpened!.isAfter(compareTime)) {
+            compareTime = _localLastOpened;
+          }
+        }
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('notifications')
+              .where('userId', isEqualTo: widget.currentUser!.uid)
+              .where('roleTarget', isEqualTo: 'user')
+              .snapshots(),
+          builder: (context, bookingSnap) {
+            bool showDot = false;
+
+            if (bookingSnap.hasData && bookingSnap.data!.docs.isNotEmpty) {
+              if (compareTime == null) {
+                showDot = true;
+              } else {
+                for (final doc in bookingSnap.data!.docs) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final Timestamp? createdAt = data['createdAt'] as Timestamp?;
+                  if (createdAt != null &&
+                      createdAt.toDate().isAfter(compareTime)) {
+                    showDot = true;
+                    break;
+                  }
+                }
+              }
+            }
+
+            return CustomNotificationButton(
+              hasNotification: showDot,
+              onTap: () {
+                // Simpan timestamp buka ke Firestore dan state lokal
+                final now = DateTime.now();
+                setState(() => _localLastOpened = now);
+                firestoreService.updateUser(widget.currentUser!.uid, {
+                  'lastOpenedBookingNotifications': now,
+                });
+                widget.onPressed();
+              },
+            );
+          },
+        );
+      },
     );
   }
 }

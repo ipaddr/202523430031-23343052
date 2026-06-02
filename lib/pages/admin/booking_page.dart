@@ -10,6 +10,9 @@ import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/widgets/background.dart';
 import 'package:gamezone/widgets/admin/admin_bottom_navbar.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
+import 'package:gamezone/widgets/common/custom_empty_state.dart';
+import 'package:gamezone/widgets/common/custom_search_bar.dart';
+import 'package:gamezone/widgets/common/status_badge.dart';
 
 class BookingPage extends StatefulWidget {
   final bool isNestedTab;
@@ -118,36 +121,9 @@ class _BookingPageState extends State<BookingPage> {
     return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match match) => '${match[1]}.')}';
   }
 
-  // Status booking
-  Color _getBookingStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'confirmed':
-        return AppColors.accentCyan;
-      case 'pending':
-        return AppColors.warningOrange;
-      case 'completed':
-        return AppColors.successGreen;
-      case 'cancelled':
-        return AppColors.errorRed;
-      default:
-        return AppColors.softGray;
-    }
-  }
-
-  String _getBookingStatusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case 'confirmed':
-        return 'CONFIRMED';
-      case 'pending':
-        return 'MENUNGGU';
-      case 'completed':
-        return 'SELESAI';
-      case 'cancelled':
-        return 'BATAL';
-      default:
-        return status.toUpperCase();
-    }
-  }
+  // Gunakan fungsi kanonik dari status_badge.dart agar konsisten di seluruh app.
+  Color _getBookingStatusColor(String status) => bookingStatusColor(status);
+  String _getBookingStatusLabel(String status) => bookingStatusLabel(status);
 
   @override
   Widget build(BuildContext context) {
@@ -230,53 +206,14 @@ class _BookingPageState extends State<BookingPage> {
           child: Row(
             children: [
               Expanded(
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.secondaryDark.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-                    border: Border.all(
-                      color: AppColors.white.withValues(alpha: 0.08),
-                      width: 1.1,
-                    ),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    style: AppTextStyle.body2.copyWith(color: AppColors.white),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value.trim().toLowerCase();
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Cari ID Booking atau Nama...',
-                      hintStyle: AppTextStyle.body3.copyWith(
-                        color: AppColors.softGray,
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: AppColors.softGray,
-                        size: 20,
-                      ),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                color: AppColors.softGray,
-                                size: 18,
-                              ),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _searchQuery = '';
-                                });
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
+                child: CustomSearchBar(
+                  controller: _searchController,
+                  hintText: 'Cari ID Booking atau Nama...',
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value.trim().toLowerCase();
+                    });
+                  },
                 ),
               ),
               const SizedBox(width: 8),
@@ -364,92 +301,18 @@ class _BookingPageState extends State<BookingPage> {
               }).toList();
 
               if (docs.isEmpty) {
-                return Align(
-                  alignment: Alignment.topCenter,
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.only(top: 120, left: 40, right: 40, bottom: 24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.bookmark_outline_rounded,
-                            color: Color(0xFF22D3EE),
-                            size: 40,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Belum ada booking',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyle.body1.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Booking yang masuk akan muncul di halaman ini.',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyle.body3.copyWith(
-                            color: const Color(0xFF64748B),
-                            height: 1.45,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                return const CustomEmptyState(
+                  icon: Icons.bookmark_outline_rounded,
+                  title: 'Belum ada booking',
+                  subtitle: 'Booking yang masuk akan muncul di halaman ini.',
                 );
               }
 
               if (filteredDocs.isEmpty) {
-                return Align(
-                  alignment: Alignment.topCenter,
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.only(top: 120, left: 40, right: 40, bottom: 24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.search_off_rounded,
-                            color: Color(0xFF22D3EE),
-                            size: 40,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Tidak ditemukan',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyle.body1.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Silakan ubah kata kunci pencarian Anda.',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyle.body3.copyWith(
-                            color: const Color(0xFF64748B),
-                            height: 1.45,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                return const CustomEmptyState(
+                  icon: Icons.search_off_rounded,
+                  title: 'Tidak ditemukan',
+                  subtitle: 'Silakan ubah kata kunci pencarian Anda.',
                 );
               }
 
@@ -500,13 +363,7 @@ class _BookingPageState extends State<BookingPage> {
         children: [
           Row(
             children: [
-              CustomImageLoader(
-                photoStr: fotoUser,
-                width: 44,
-                height: 44,
-                radius: 999,
-                fallbackIcon: Icons.person_rounded,
-              ),
+              CustomUserAvatar(photoUrl: fotoUser, size: 44, hasBorder: false),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -529,29 +386,9 @@ class _BookingPageState extends State<BookingPage> {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: _getBookingStatusColor(
-                    statusBooking,
-                  ).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _getBookingStatusColor(
-                      statusBooking,
-                    ).withValues(alpha: 0.25),
-                  ),
-                ),
-                child: Text(
-                  _getBookingStatusLabel(statusBooking),
-                  style: AppTextStyle.caption2.copyWith(
-                    color: _getBookingStatusColor(statusBooking),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+              StatusBadge(
+                label: _getBookingStatusLabel(statusBooking),
+                color: _getBookingStatusColor(statusBooking),
               ),
             ],
           ),
@@ -583,7 +420,7 @@ class _BookingPageState extends State<BookingPage> {
               ),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       'JADWAL',
@@ -594,6 +431,7 @@ class _BookingPageState extends State<BookingPage> {
                     const SizedBox(height: 4),
                     Text(
                       '$tanggalBooking, $jamMulai - $jamSelesai',
+                      textAlign: TextAlign.right,
                       style: AppTextStyle.body2.copyWith(
                         color: AppColors.white,
                         fontWeight: FontWeight.w600,
@@ -633,8 +471,8 @@ class _BookingPageState extends State<BookingPage> {
                       const SizedBox(width: 6),
                       Text(
                         statusPembayaran.toLowerCase() == 'paid'
-                            ? 'paid'
-                            : 'unpaid',
+                            ? 'Sudah Dibayar'
+                            : 'Belum Dibayar',
                         style: AppTextStyle.body2.copyWith(
                           color: statusPembayaran.toLowerCase() == 'paid'
                               ? AppColors.successGreen
@@ -667,34 +505,47 @@ class _BookingPageState extends State<BookingPage> {
               ),
             ],
           ),
-          if (statusBooking.toLowerCase() != 'cancelled') ...[
+          if (statusBooking.toLowerCase() != 'cancelled' &&
+              statusBooking.toLowerCase() != 'rejected') ...[
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
-              height: 44,
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pushNamed(
                     context,
                     '/admin-booking-detail',
-                    arguments: {'bookingId': bookingId, 'bookingData': data},
+                    arguments: {
+                      'bookingId': bookingId,
+                      'bookingData': data,
+                      'viewMode': 'admin',
+                    },
                   );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.paddingXL,
+                    vertical: AppTheme.paddingL,
+                  ),
+                  minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                     side: BorderSide(
                       color: Colors.white.withValues(alpha: 0.12),
                     ),
+                  ),
+                  textStyle: AppTextStyle.buttonMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.white,
                   ),
                 ),
                 child: Text(
                   statusBooking.toLowerCase() == 'completed'
                       ? 'Lihat Riwayat'
                       : 'Detail Booking',
-                  style: AppTextStyle.buttonSmall.copyWith(
+                  style: AppTextStyle.buttonMedium.copyWith(
                     color: AppColors.white,
                     fontWeight: FontWeight.bold,
                   ),
@@ -761,12 +612,24 @@ class _BookingPageState extends State<BookingPage> {
                           'Semua',
                           'Pending',
                           'Confirmed',
+                          'Active',
                           'Completed',
                           'Cancelled',
+                          'Rejected',
                         ].map((status) {
                           final bool isSelected = _selectedStatus == status;
+                          final String displayLabel = switch (status
+                              .toLowerCase()) {
+                            'pending' => 'Menunggu',
+                            'confirmed' => 'Dikonfirmasi',
+                            'active' => 'Sedang Bermain',
+                            'completed' => 'Selesai',
+                            'cancelled' => 'Dibatalkan',
+                            'rejected' => 'Ditolak',
+                            _ => status,
+                          };
                           return ChoiceChip(
-                            label: Text(status),
+                            label: Text(displayLabel),
                             selected: isSelected,
                             onSelected: (selected) {
                               setSheetState(() => _selectedStatus = status);

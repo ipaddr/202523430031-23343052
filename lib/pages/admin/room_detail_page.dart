@@ -9,6 +9,7 @@ import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/widgets/background.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
 import 'package:gamezone/utils/helpers.dart';
+import 'package:gamezone/widgets/common/status_badge.dart';
 
 class RoomDetailPage extends StatefulWidget {
   const RoomDetailPage({super.key});
@@ -646,31 +647,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                             Positioned(
                               top: 14,
                               right: 14,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppTheme.paddingM,
-                                  vertical: AppTheme.paddingS,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _statusColor(
-                                    status,
-                                  ).withValues(alpha: 0.14),
-                                  borderRadius: BorderRadius.circular(
-                                    AppTheme.radiusLarge,
-                                  ),
-                                  border: Border.all(
-                                    color: _statusColor(
-                                      status,
-                                    ).withValues(alpha: 0.18),
-                                  ),
-                                ),
-                                child: Text(
-                                  _statusLabel(status),
-                                  style: AppTextStyle.caption2.copyWith(
-                                    color: _statusColor(status),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
+                              child: StatusBadge(
+                                label: _statusLabel(status),
+                                color: _statusColor(status),
                               ),
                             ),
                           ],

@@ -8,6 +8,7 @@ import '../config/cloudinary_config.dart';
 import '../services/firestore_service.dart';
 import '../styles/app_colors.dart';
 import '../widgets/background.dart';
+import 'package:gamezone/widgets/common/custom_image_loader.dart';
 
 // Halaman untuk mengubah profil pengguna yang sedang login.
 class EditProfilePage extends StatefulWidget {
@@ -793,66 +794,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                                   ),
                                             child: Stack(
                                               children: [
-                                                Container(
-                                                  width: 100,
-                                                  height: 100,
-                                                  decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    border: Border.all(
-                                                      color:
-                                                          AppColors.accentCyan,
-                                                      width: 2,
-                                                    ),
-                                                    color: const Color(
-                                                      0xFF141B31,
-                                                    ),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: AppColors
-                                                            .accentCyan
-                                                            .withValues(
-                                                              alpha: 0.15,
-                                                            ),
-                                                        blurRadius: 14,
-                                                        spreadRadius: 2,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  child:
-                                                      _fotoProfilController.text
-                                                          .trim()
-                                                          .isNotEmpty
-                                                      ? ClipRRect(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                50,
-                                                              ),
-                                                          child: Image.network(
-                                                            _fotoProfilController
-                                                                .text
-                                                                .trim(),
-                                                            fit: BoxFit.cover,
-                                                            errorBuilder:
-                                                                (
-                                                                  context,
-                                                                  error,
-                                                                  stackTrace,
-                                                                ) => const Icon(
-                                                                  Icons.person,
-                                                                  color: Color(
-                                                                    0xFF64748B,
-                                                                  ),
-                                                                  size: 44,
-                                                                ),
-                                                          ),
-                                                        )
-                                                      : const Icon(
-                                                          Icons.person,
-                                                          color: Color(
-                                                            0xFF64748B,
-                                                          ),
-                                                          size: 44,
-                                                        ),
+                                                CustomUserAvatar(
+                                                  photoUrl: _fotoProfilController.text.trim(),
+                                                  size: 100,
+                                                  hasBorder: true,
                                                 ),
                                                 Positioned(
                                                   bottom: 0,

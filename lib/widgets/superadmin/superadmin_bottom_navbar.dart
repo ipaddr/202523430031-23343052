@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:gamezone/styles/app_colors.dart';
+import 'package:gamezone/styles/app_theme.dart';
+import 'package:gamezone/styles/app_textstyle.dart';
 
 class SuperAdminNavItem extends StatelessWidget {
   final bool isActive;
@@ -16,10 +19,8 @@ class SuperAdminNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Item navigasi bawah dengan state aktif dan efek gradient.
-    final Color textColor = isActive
-        ? const Color(0xFF22D3EE)
-        : const Color(0xFF64748B);
+    final Color inactiveColor = AppColors.lightText;
+    final Color activeColor = AppColors.white;
 
     return GestureDetector(
       onTap: onTap,
@@ -28,34 +29,34 @@ class SuperAdminNavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            isActive
-                ? Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF22D3EE), Color(0xFF8B5CF6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Icon(icon, color: Colors.white, size: 20),
-                  )
-                : Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(color: Colors.transparent),
-                    child: Icon(icon, color: const Color(0xFF64748B), size: 22),
-                  ),
-            const SizedBox(height: 5),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                gradient: isActive ? AppColors.gradientCyanToBlue : null,
+                color: isActive ? null : Colors.transparent,
+                border: Border.all(
+                  color: isActive
+                      ? AppColors.white.withValues(alpha: 0.08)
+                      : Colors.transparent,
+                ),
+              ),
+              child: Icon(
+                icon,
+                color: isActive ? activeColor : inactiveColor,
+                size: isActive ? 21 : 22,
+              ),
+            ),
+            const SizedBox(height: 6),
             Text(
               label,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 9.5,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                letterSpacing: 0.5,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyle.caption2.copyWith(
+                color: isActive ? AppColors.accentCyan : inactiveColor,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                letterSpacing: 0.4,
               ),
             ),
           ],

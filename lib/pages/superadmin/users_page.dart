@@ -2,10 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../services/firestore_service.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
-import '../../styles/app_colors.dart';
-import '../../styles/app_textstyle.dart';
-import '../../styles/app_theme.dart';
 import 'users_detail_page.dart';
+import 'package:gamezone/widgets/common/custom_empty_state.dart';
+import 'package:gamezone/widgets/common/custom_search_bar.dart';
 
 /// Halaman Kelola Pengguna & Game Station untuk Super Admin
 class UsersPage extends StatefulWidget {
@@ -137,53 +136,14 @@ class _UsersPageState extends State<UsersPage> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.secondaryDark.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-                    border: Border.all(
-                      color: AppColors.white.withValues(alpha: 0.08),
-                      width: 1.1,
-                    ),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    style: AppTextStyle.body2.copyWith(color: AppColors.white),
-                    onChanged: (val) {
-                      setState(() {
-                        _userSearchQuery = val.trim().toLowerCase();
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Cari nama, email, atau nama station...',
-                      hintStyle: AppTextStyle.body3.copyWith(
-                        color: AppColors.softGray,
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: AppColors.softGray,
-                        size: 20,
-                      ),
-                      suffixIcon: _userSearchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                color: AppColors.softGray,
-                                size: 18,
-                              ),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _userSearchQuery = '';
-                                });
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
+                child: CustomSearchBar(
+                  controller: _searchController,
+                  hintText: 'Cari nama, email, atau nama station...',
+                  onChanged: (val) {
+                    setState(() {
+                      _userSearchQuery = val.trim().toLowerCase();
+                    });
+                  },
                 ),
               ),
 
@@ -605,12 +565,10 @@ class _UsersPageState extends State<UsersPage> {
         children: [
           Row(
             children: [
-              CustomImageLoader(
-                photoStr: data['foto'],
-                width: 44,
-                height: 44,
-                radius: 22,
-                fallbackIcon: Icons.person_rounded,
+              CustomUserAvatar(
+                photoUrl: data['foto'],
+                size: 44,
+                hasBorder: false,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -784,47 +742,10 @@ class _UsersPageState extends State<UsersPage> {
     required String title,
     required String subtitle,
   }) {
-    // Menggunakan top alignment dan scrollable view dengan top padding
-    // agar layout tetap stabil dan tidak terdorong/jumping saat keyboard muncul.
-    return Align(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(top: 120, left: 40, right: 40, bottom: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: const Color(0xFF22D3EE), size: 40),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 12,
-                height: 1.45,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return CustomEmptyState(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
     );
   }
 }

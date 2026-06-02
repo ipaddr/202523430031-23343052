@@ -148,13 +148,19 @@ class DashboardService {
   // Menghitung jumlah transaksi pemesanan khusus untuk hari ini
   Future<int> getBookingHariIni() async {
     try {
-      final snapshot = await _db.collection('bookings').get();
       final DateTime today = DateTime.now();
+      // Format tanggalBooking sesuai yang disimpan di Firestore: 'YYYY-MM-DD'
+      final String todayStr =
+          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-      return snapshot.docs.where((doc) {
-        final DateTime? createdAt = _readDateTime(doc.data());
-        return createdAt != null && _isSameDay(createdAt, today);
-      }).length;
+      // Filter langsung di Firestore menggunakan tanggalBooking (tanggal bermain
+      // yang dipilih user), bukan createdAt (tanggal dokumen dibuat).
+      final snapshot = await _db
+          .collection('bookings')
+          .where('tanggalBooking', isEqualTo: todayStr)
+          .get();
+
+      return snapshot.size;
     } catch (e) {
       debugPrint('Error getting booking hari ini: $e');
       return 0;
@@ -567,23 +573,33 @@ class DashboardService {
   // Membaca booking
   Future<int> getTotalPemasukan() async {
     try {
-      final bookingSnapshot = await _db.collection('bookings').get();
-      var total = 0;
+      final DateTime now = DateTime.now();
+      final String monthStart =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
+      // Hari terakhir bulan: ambil hari pertama bulan depan lalu kurangi 1 hari
+      final DateTime firstOfNextMonth = (now.month < 12)
+          ? DateTime(now.year, now.month + 1, 1)
+          : DateTime(now.year + 1, 1, 1);
+      final DateTime lastDay = firstOfNextMonth.subtract(
+        const Duration(days: 1),
+      );
+      final String monthEnd =
+          '${lastDay.year}-${lastDay.month.toString().padLeft(2, '0')}-${lastDay.day.toString().padLeft(2, '0')}';
 
+      // Hanya booking yang sudah dibayar (statusPembayaran: paid)
+      // dan tanggal bermain dalam bulan berjalan.
+      final bookingSnapshot = await _db
+          .collection('bookings')
+          .where('statusPembayaran', isEqualTo: 'paid')
+          .where('tanggalBooking', isGreaterThanOrEqualTo: monthStart)
+          .where('tanggalBooking', isLessThanOrEqualTo: monthEnd)
+          .get();
+
+      var total = 0;
       for (final doc in bookingSnapshot.docs) {
         total += (doc.data()['totalHarga'] as num?)?.toInt() ?? 0;
       }
-
-      if (total > 0) {
-        return total;
-      }
-
-      final stationSnapshot = await _db.collection('stations').get();
-      var fallbackTotal = 0;
-      for (final doc in stationSnapshot.docs) {
-        fallbackTotal += _readInt(doc.data(), const ['totalPemasukan']);
-      }
-      return fallbackTotal;
+      return total;
     } catch (e) {
       debugPrint('Error getting total pemasukan: $e');
       return 0;
@@ -782,16 +798,20 @@ class DashboardService {
 
   Future<int> getStationBookingHariIni(String stationId) async {
     try {
+      final DateTime today = DateTime.now();
+      // Format tanggalBooking sesuai yang disimpan di Firestore: 'YYYY-MM-DD'
+      final String todayStr =
+          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      // Filter langsung di Firestore — tanggalBooking adalah tanggal bermain
+      // yang dipilih user, bukan tanggal dokumen booking dibuat (createdAt).
       final snapshot = await _db
           .collection('bookings')
           .where('stationId', isEqualTo: stationId)
+          .where('tanggalBooking', isEqualTo: todayStr)
           .get();
-      final DateTime today = DateTime.now();
 
-      return snapshot.docs.where((doc) {
-        final DateTime? createdAt = _readDateTime(doc.data());
-        return createdAt != null && _isSameDay(createdAt, today);
-      }).length;
+      return snapshot.size;
     } catch (e) {
       debugPrint('Error getting station booking hari ini: $e');
       return 0;
@@ -800,16 +820,14 @@ class DashboardService {
 
   Future<int> getStationTotalPemasukan(String stationId) async {
     try {
-      final bookingSnapshot = await _db
-          .collection('bookings')
-          .where('stationId', isEqualTo: stationId)
-          .get();
-      var total = 0;
-
-      for (final doc in bookingSnapshot.docs) {
-        total += (doc.data()['totalHarga'] as num?)?.toInt() ?? 0;
+      final doc = await _db.collection('stations').doc(stationId).get();
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && data.containsKey('totalPemasukan')) {
+          return (data['totalPemasukan'] as num).toInt();
+        }
       }
-      return total;
+      return 0;
     } catch (e) {
       debugPrint('Error getting station total pemasukan: $e');
       return 0;
@@ -842,19 +860,6 @@ class DashboardService {
       }
     }
     return false;
-  }
-
-  int _readInt(Map<String, dynamic> data, List<String> keys) {
-    for (final key in keys) {
-      final value = data[key];
-      if (value is int) return value;
-      if (value is double) return value.toInt();
-      if (value is num) return value.toInt();
-      if (value != null) {
-        return int.tryParse(value.toString()) ?? 0;
-      }
-    }
-    return 0;
   }
 
   double? _readDouble(Map<String, dynamic> data, List<String> keys) {
@@ -915,12 +920,6 @@ class DashboardService {
       }
     }
     return null;
-  }
-
-  bool _isSameDay(DateTime first, DateTime second) {
-    return first.year == second.year &&
-        first.month == second.month &&
-        first.day == second.day;
   }
 
   String _formatRelativeTime(DateTime timestamp) {

@@ -6,7 +6,6 @@ import 'package:gamezone/widgets/background.dart';
 import 'package:gamezone/widgets/startup_widgets.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 
@@ -226,9 +225,17 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
   Future<void> _handleStartupNavigation() async {
     if (!mounted) return;
 
-    final user = FirebaseAuth.instance.currentUser;
+    // Gunakan resolveCurrentUser agar token Firebase Auth sempat dimuat
+    // sebelum SplashPage memutuskan arah navigasi. Ini mencegah cold-start
+    // race condition di mana currentUser masih null sesaat setelah app dibuka.
+    final authService = AuthService();
+    final user = await authService.resolveCurrentUser(
+      timeout: const Duration(seconds: 3),
+    );
 
     if (user == null) {
+      // Tidak ada sesi aktif → tampilkan onboarding jika belum pernah dilihat,
+      // atau langsung ke login jika sudah.
       final prefs = await SharedPreferences.getInstance();
       final seen = prefs.getBool('seenOnboarding') ?? false;
       if (!mounted) return;
@@ -240,13 +247,18 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
       return;
     }
 
+    // Jika user sudah login, pastikan seenOnboarding bernilai true di preferences.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('seenOnboarding', true);
+    } catch (_) {}
+
     try {
       final firestore = FirestoreService();
-      final authService = AuthService();
       final data = await firestore.getUserData(user.uid);
 
       if (data == null) {
-        // Orphaned auth user - sign out and go to onboarding/login
+        // Orphaned auth user - sign out dan arahkan ke login
         await authService.signOut();
         if (!mounted) return;
         Navigator.of(context).pushReplacementNamed('/login');
@@ -257,7 +269,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
       final status = data['status'] as String? ?? 'active';
 
       if (role == 'admin' && status != 'active') {
-        // Not yet verified or rejected - force to login so message appears
+        // Belum diverifikasi atau ditolak - paksa logout agar muncul pesan error di login
         await authService.signOut();
         if (!mounted) return;
         Navigator.of(context).pushReplacementNamed('/login');
@@ -276,9 +288,14 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(nextRoute);
     } catch (e) {
-      // On error, fall back to onboarding
+      // Jika terjadi error saat memuat data profil tapi user sudah login,
+      // arahkan ke /login (lakukan signOut demi keamanan) alih-alih menampilkan onboarding.
+      try {
+        await authService.signOut();
+      } catch (_) {}
+
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed('/onboarding');
+      Navigator.of(context).pushReplacementNamed('/login');
     }
   }
 

@@ -29,6 +29,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final AuthService _authService = AuthService();
   late Future<_DashboardPageData> _dashboardFuture;
   int _activeTabIndex = 0;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -49,8 +50,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       userFirestoreData = await userFuture;
       final String? userName =
           userFirestoreData?['nama']?.toString() ??
-          userFirestoreData?['name']?.toString() ??
-          currentUser.displayName;
+          userFirestoreData?['name']?.toString();
       final String? userEmail =
           userFirestoreData?['email']?.toString() ?? currentUser.email;
 
@@ -176,10 +176,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
               const SizedBox(height: 16),
               Expanded(
-                child: FutureBuilder<QuerySnapshot>(
-                  future: _firestoreService.getStationBookingNotificationsOnce(
-                    resolvedStationId,
-                  ),
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('notifications')
+                      .where('roleTarget', isEqualTo: 'admin')
+                      .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(
@@ -232,28 +233,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       itemCount: docs.length > 20 ? 20 : docs.length,
                       itemBuilder: (context, index) {
                         final data = docs[index].data() as Map<String, dynamic>;
-                        final String customerName =
-                            readFirstString(data, const [
-                              'namaUser',
-                              'userName',
-                              'nama',
-                              'name',
-                            ]) ??
-                            'Pelanggan';
-                        final String unitName =
-                            data['namaUnit']?.toString() ?? 'Unit';
-                        final String totalText = _formatCurrency(
-                          _readFirstInt(data, const [
-                            'totalPemasukan',
-                            'totalPrice',
-                            'totalHarga',
-                            'amount',
-                            'price',
-                            'biaya',
-                            'nominal',
-                            'total',
-                          ]),
-                        );
+                        final String title = data['title']?.toString() ?? 'Booking';
+                        final String message = data['message']?.toString() ?? '';
                         final Timestamp? createdAt =
                             data['createdAt'] as Timestamp?;
 
@@ -295,7 +276,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '$customerName memesan $unitName',
+                                      title,
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 14,
@@ -304,9 +285,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      totalText.isNotEmpty
-                                          ? 'Total $totalText'
-                                          : 'Booking baru masuk',
+                                      message,
                                       style: const TextStyle(
                                         color: Color(0xFF94A3B8),
                                         fontSize: 11,
@@ -396,6 +375,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget build(BuildContext context) {
     final currentUser = _authService.getCurrentUser();
 
+    if (currentUser == null) {
+      if (!_isLoggingOut) {
+        _isLoggingOut = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(
+            context,
+            rootNavigator: true,
+          ).pushNamedAndRemoveUntil('/splash', (route) => false);
+        });
+      }
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.accentCyan),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       // Menonaktifkan resize agar background tetap stabil di belakang keyboard
@@ -458,8 +456,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     final String adminName =
                         userData?['nama'] ??
                         userData?['name'] ??
-                        currentUser?.displayName ??
-                        currentUser?.email ??
                         'Admin';
                     final String stationName =
                         stationData?['namaStation'] ??
@@ -481,7 +477,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     avatarUrl ??=
                         userData?['foto'] ??
                         userData?['photoUrl'] ??
-                        currentUser?.photoURL;
+                        '';
 
                     return Center(
                       child: ConstrainedBox(
@@ -532,6 +528,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     : _buildDashboardContent(
                                         summary: data.summary,
                                         unitStatus: data.unitStatus,
+                                        stationId: stationData?['id']?.toString() ?? '',
                                       ),
                               ),
                             ),
@@ -565,12 +562,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildDashboardContent({
     required DashboardAdminSummary summary,
     required UnitStatusSummary unitStatus,
+    required String stationId,
   }) {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
       children: [
-        RatingCard(rating: summary.ratingGameStation),
+        RatingAnalyticsCard(
+          stationId: stationId,
+          averageRating: summary.ratingGameStation,
+        ),
         const SizedBox(height: 16),
         GridView.count(
           crossAxisCount: 2,
@@ -606,6 +607,251 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
         const SizedBox(height: 8),
       ],
+    );
+  }
+}
+
+class RatingAnalyticsCard extends StatelessWidget {
+  final String stationId;
+  final double averageRating;
+
+  const RatingAnalyticsCard({
+    super.key,
+    required this.stationId,
+    required this.averageRating,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (stationId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('reviews')
+          .where('stationId', isEqualTo: stationId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(color: AppColors.accentCyan),
+            ),
+          );
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+        final totalReview = docs.length;
+
+        // Sort reviews by createdAt descending
+        final sortedDocs = [...docs];
+        sortedDocs.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final Timestamp? aTime = aData['createdAt'] as Timestamp?;
+          final Timestamp? bTime = bData['createdAt'] as Timestamp?;
+          final int aMillis = aTime?.millisecondsSinceEpoch ?? 0;
+          final int bMillis = bTime?.millisecondsSinceEpoch ?? 0;
+          return bMillis.compareTo(aMillis);
+        });
+
+        final latestReviews = sortedDocs.take(5).toList();
+
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B).withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFF334155).withValues(alpha: 0.5),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header Rating & Total
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Rating Station',
+                            style: AppTextStyle.body1.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Ringkasan performa ulasan stasiun game Anda.',
+                            style: AppTextStyle.caption2.copyWith(color: AppColors.softGray),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            color: Color(0xFFF59E0B),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            averageRating > 0 ? averageRating.toStringAsFixed(1) : '0.0',
+                            style: AppTextStyle.body2.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '($totalReview)',
+                            style: AppTextStyle.caption2.copyWith(
+                              color: AppColors.softGray,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Color(0xFF334155), height: 1),
+              
+              // List Review Terbaru
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Review Terbaru',
+                      style: AppTextStyle.caption1.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (latestReviews.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: Text(
+                            'Belum ada ulasan',
+                            style: AppTextStyle.body3.copyWith(
+                              color: AppColors.softGray,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      ...latestReviews.map((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        final String userName = data['userName']?.toString() ?? 'Gamers';
+                        final int rating = (data['rating'] as num?)?.toInt() ?? 5;
+                        final String comment = data['comment']?.toString() ?? '';
+                        final Timestamp? createdAt = data['createdAt'] as Timestamp?;
+                        final String dateStr = createdAt != null
+                            ? '${createdAt.toDate().day}/${createdAt.toDate().month}/${createdAt.toDate().year}'
+                            : '';
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withValues(alpha: 0.02),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: AppColors.white.withValues(alpha: 0.02),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      userName,
+                                      style: AppTextStyle.caption1.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    dateStr,
+                                    style: AppTextStyle.caption2.copyWith(
+                                      color: AppColors.softGray,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: List.generate(5, (index) {
+                                  return Icon(
+                                    Icons.star_rounded,
+                                    color: index < rating ? const Color(0xFFF59E0B) : const Color(0xFF475569),
+                                    size: 12,
+                                  );
+                                }),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                comment,
+                                style: AppTextStyle.body3.copyWith(
+                                  color: const Color(0xFFCBD5E1),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -36,6 +36,17 @@ class AppTheme {
     BoxShadow(color: Color(0x1522D3EE), blurRadius: 20, offset: Offset(0, 4)),
   ];
 
+  // Dekorasi card standar GameZone — digunakan di seluruh halaman User, Admin, SuperAdmin.
+  static BoxDecoration get cardDecoration => BoxDecoration(
+    color: AppColors.secondaryDark.withValues(alpha: 0.78),
+    borderRadius: BorderRadius.circular(radiusXL),
+    border: Border.all(
+      color: AppColors.accentCyan.withValues(alpha: 0.08),
+      width: 1.1,
+    ),
+    boxShadow: shadowSoft,
+  );
+
   // Konfigurasi Tema Utama
   static ThemeData get theme {
     return ThemeData(

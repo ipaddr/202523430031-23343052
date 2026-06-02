@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:gamezone/services/firestore_service.dart';
 
 import 'package:gamezone/styles/app_colors.dart';
+import 'package:gamezone/widgets/common/custom_notification_button.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
-import 'package:gamezone/styles/gradients.dart';
+import 'package:gamezone/widgets/common/custom_image_loader.dart';
 
 // Header khusus untuk halaman Super Admin.
 // Menampilkan avatar, teks sapaan, dan tombol notifikasi.
@@ -106,12 +107,9 @@ class _NotificationButton extends StatelessWidget {
   Widget build(BuildContext context) {
     // Tombol lonceng membaca status notifikasi admin dari Firestore.
     if (currentUser == null) {
-      return _emptyButton(
-        const Icon(
-          Icons.notifications_none_rounded,
-          color: Color(0xFF94A3B8),
-          size: 22,
-        ),
+      return CustomNotificationButton(
+        hasNotification: false,
+        onTap: () {},
       );
     }
 
@@ -172,72 +170,9 @@ class _NotificationButton extends StatelessWidget {
   }
 
   Widget _notificationShell({required bool showDot, required VoidCallback onTap}) {
-    // Wadah visual untuk ikon lonceng dan titik indikator.
-    return Material(
-      color: AppColors.secondaryDark.withValues(alpha: 0.9),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: AppColors.accentCyan.withValues(alpha: 0.15),
-          width: 1,
-        ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          width: 44,
-          height: 44,
-          alignment: Alignment.center,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(
-                Icons.notifications_none_rounded,
-                color: AppColors.softGray,
-                size: 22,
-              ),
-              if (showDot)
-                Positioned(
-                  right: -3,
-                  top: -3,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: AppColors.accentCyan,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.accentCyan.withValues(alpha: 0.45),
-                          blurRadius: 6,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _emptyButton(Widget child) {
-    // Tampilan cadangan saat belum ada user yang login.
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: const Color(0xFF141B31),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFF22D3EE).withValues(alpha: 0.15),
-          width: 1.2,
-        ),
-      ),
-      child: child,
+    return CustomNotificationButton(
+      hasNotification: showDot,
+      onTap: onTap,
     );
   }
 }
@@ -253,50 +188,9 @@ class _SuperAdminAvatar extends StatelessWidget {
 
     // Helper untuk membangun tampilan avatar dengan gradient dan border.
     Widget avatarShell(String? avatarUrl) {
-      return Container(
-        width: 52,
-        height: 52,
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: Gradients.accent,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.accentCyan.withValues(alpha: 0.25),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.primaryDarkNavy,
-            border: Border.all(
-              color: const Color(0xFF22D3EE).withValues(alpha: 0.5),
-              width: 1.5,
-            ),
-          ),
-          child: ClipOval(
-            child: avatarUrl != null && avatarUrl.isNotEmpty
-                ? Image.network(
-                    avatarUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(
-                        Icons.person_rounded,
-                        color: AppColors.softGray,
-                        size: 24,
-                      );
-                    },
-                  )
-                : const Icon(
-                    Icons.person_rounded,
-                    color: AppColors.softGray,
-                    size: 24,
-                  ),
-          ),
-        ),
+      return CustomUserAvatar(
+        photoUrl: avatarUrl,
+        size: 52,
       );
     }
 

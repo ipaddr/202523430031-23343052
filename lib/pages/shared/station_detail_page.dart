@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'package:gamezone/services/firestore_service.dart';
@@ -394,6 +395,14 @@ class _StationDetailPageState extends State<StationDetailPage> {
 
               // Daftar Room / Unit
               _buildUnitsSection(units),
+              const SizedBox(height: 16),
+
+              // Rating & Review Section
+              _buildReviewsSection(
+                station['id']?.toString() ?? '',
+                rating,
+                totalReview is num ? totalReview.toInt() : int.tryParse(totalReview?.toString() ?? '0') ?? 0,
+              ),
               const SizedBox(height: 16),
 
               // Tombol Aksi Admin
@@ -887,6 +896,243 @@ class _StationDetailPageState extends State<StationDetailPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildReviewsSection(String stationId, double rating, int totalReview) {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.paddingL),
+      decoration: BoxDecoration(
+        color: AppColors.secondaryDark.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(AppTheme.radiusXL),
+        border: Border.all(
+          color: AppColors.accentCyan.withValues(alpha: 0.08),
+          width: 1.1,
+        ),
+        boxShadow: AppTheme.shadowSoft,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Rating & Review',
+                      style: AppTextStyle.h4.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Ulasan dari para gamers GameZone.',
+                      style: AppTextStyle.body3.copyWith(color: AppColors.softGray),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                  border: Border.all(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.star_rounded,
+                      color: Color(0xFFF59E0B),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      totalReview > 0 ? rating.toStringAsFixed(1) : '0.0',
+                      style: AppTextStyle.caption1.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '($totalReview review)',
+                      style: AppTextStyle.caption2.copyWith(
+                        color: AppColors.softGray,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('reviews')
+                .where('stationId', isEqualTo: stationId)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: AppColors.accentCyan),
+                );
+              }
+              if (snapshot.hasError) {
+                return Text(
+                  'Gagal memuat review.',
+                  style: AppTextStyle.body3.copyWith(color: AppColors.errorRed),
+                );
+              }
+
+              final docs = [...(snapshot.data?.docs ?? const [])];
+
+              // Urutkan review terbaru di paling atas
+              docs.sort((a, b) {
+                final aData = a.data() as Map<String, dynamic>;
+                final bData = b.data() as Map<String, dynamic>;
+                final Timestamp? aTime = aData['createdAt'] as Timestamp?;
+                final Timestamp? bTime = bData['createdAt'] as Timestamp?;
+                final int aMillis = aTime?.millisecondsSinceEpoch ?? 0;
+                final int bMillis = bTime?.millisecondsSinceEpoch ?? 0;
+                return bMillis.compareTo(aMillis);
+              });
+
+              if (docs.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  alignment: Alignment.center,
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.rate_review_outlined,
+                        color: AppColors.softGray.withValues(alpha: 0.4),
+                        size: 36,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Belum ada review untuk station ini',
+                        style: AppTextStyle.body3.copyWith(color: AppColors.softGray),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: docs.length,
+                itemBuilder: (context, index) {
+                  final data = docs[index].data() as Map<String, dynamic>;
+                  final String userName = data['userName']?.toString() ?? 'Gamers';
+                  final String userPhoto = data['userPhoto']?.toString() ?? '';
+                  final int rating = (data['rating'] as num?)?.toInt() ?? 5;
+                  final String comment = data['comment']?.toString() ?? '';
+                  final Timestamp? createdAt = data['createdAt'] as Timestamp?;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.white.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                      border: Border.all(
+                        color: AppColors.accentCyan.withValues(alpha: 0.05),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Avatar User
+                        CustomUserAvatar(
+                          photoUrl: userPhoto.isNotEmpty ? userPhoto : null,
+                          size: 36,
+                          hasBorder: false,
+                        ),
+                        const SizedBox(width: 12),
+                        // Konten Review
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      userName,
+                                      style: AppTextStyle.body2.copyWith(
+                                        color: AppColors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatReviewDate(createdAt),
+                                    style: AppTextStyle.caption2.copyWith(
+                                      color: AppColors.softGray,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              // Baris Bintang
+                              Row(
+                                children: List.generate(5, (starIdx) {
+                                  return Icon(
+                                    Icons.star_rounded,
+                                    color: starIdx < rating
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF475569),
+                                    size: 14,
+                                  );
+                                }),
+                              ),
+                              const SizedBox(height: 6),
+                              // Komentar
+                              Text(
+                                comment,
+                                style: AppTextStyle.body3.copyWith(
+                                  color: const Color(0xFFCBD5E1),
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatReviewDate(Timestamp? timestamp) {
+    if (timestamp == null) return 'Baru saja';
+    final DateTime date = timestamp.toDate();
+    final List<String> months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   Widget _buildAdminActions() {

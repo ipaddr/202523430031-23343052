@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:gamezone/services/firestore_service.dart';
 import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
-import 'package:gamezone/styles/gradients.dart';
+import 'package:gamezone/widgets/common/custom_notification_button.dart';
+import 'package:gamezone/widgets/common/custom_image_loader.dart';
 
 class AdminHeader extends StatelessWidget {
   final User? currentUser;
@@ -113,50 +114,9 @@ class _AdminAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget avatar = Container(
-      width: 52,
-      height: 52,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: Gradients.accent,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.accentCyan.withValues(alpha: 0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.primaryDarkNavy,
-          border: Border.all(
-            color: const Color(0xFF22D3EE).withValues(alpha: 0.5),
-            width: 1.5,
-          ),
-        ),
-        child: ClipOval(
-          child: avatarUrl != null && avatarUrl!.isNotEmpty
-              ? Image.network(
-                  avatarUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(
-                      Icons.person_rounded,
-                      color: AppColors.softGray,
-                      size: 24,
-                    );
-                  },
-                )
-              : const Icon(
-                  Icons.person_rounded,
-                  color: AppColors.softGray,
-                  size: 24,
-                ),
-        ),
-      ),
+    final Widget avatar = CustomUserAvatar(
+      photoUrl: avatarUrl,
+      size: 52,
     );
 
     if (onTap == null) {
@@ -194,7 +154,6 @@ class _NotificationButton extends StatelessWidget {
     }
 
     final FirestoreService firestoreService = FirestoreService();
-    final bool hasStationId = stationId != null && stationId!.isNotEmpty;
 
     return StreamBuilder<DocumentSnapshot>(
       stream: firestoreService.getUserStream(currentUser!.uid),
@@ -213,15 +172,26 @@ class _NotificationButton extends StatelessWidget {
           }
         }
 
-        return FutureBuilder<int>(
-          future: hasStationId
-              ? firestoreService.getStationBookingNotificationCount(
-                  stationId!,
-                  lastOpenedAt: compareTime,
-                )
-              : Future.value(0),
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('notifications')
+              .where('roleTarget', isEqualTo: 'admin')
+              .snapshots(),
           builder: (context, snapshot) {
-            final int unreadCount = snapshot.data ?? 0;
+            int unreadCount = 0;
+            if (snapshot.hasData) {
+              if (compareTime == null) {
+                unreadCount = snapshot.data!.docs.length;
+              } else {
+                for (final doc in snapshot.data!.docs) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final Timestamp? createdAt = data['createdAt'] as Timestamp?;
+                  if (createdAt != null && createdAt.toDate().isAfter(compareTime)) {
+                    unreadCount++;
+                  }
+                }
+              }
+            }
 
             return _notificationShell(
               notificationCount: unreadCount,
@@ -242,69 +212,10 @@ class _NotificationButton extends StatelessWidget {
   }
 
   Widget _notificationShell({required int notificationCount, required VoidCallback onTap}) {
-    // Wadah visual untuk ikon lonceng dan badge jumlah booking baru.
-    return Material(
-      color: AppColors.secondaryDark.withValues(alpha: 0.9),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: AppColors.accentCyan.withValues(alpha: 0.15),
-          width: 1,
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          width: 44,
-          height: 44,
-          alignment: Alignment.center,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(
-                Icons.notifications_none_rounded,
-                color: AppColors.softGray,
-                size: 22,
-              ),
-              if (notificationCount > 0)
-                Positioned(
-                  right: -3,
-                  top: -3,
-                  child: Container(
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.accentCyan,
-                      borderRadius: BorderRadius.circular(999),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.accentCyan.withValues(alpha: 0.45),
-                          blurRadius: 6,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      notificationCount > 99
-                          ? '99+'
-                          : notificationCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+    return CustomNotificationButton(
+      hasNotification: notificationCount > 0,
+      notificationCount: notificationCount,
+      onTap: onTap,
     );
   }
 }

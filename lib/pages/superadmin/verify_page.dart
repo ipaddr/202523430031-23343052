@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../services/firestore_service.dart';
-import '../../styles/app_colors.dart';
-import '../../styles/app_textstyle.dart';
-import '../../styles/app_theme.dart';
-import 'verify_detail_page.dart';
+import 'package:gamezone/widgets/common/custom_empty_state.dart';
+import 'package:gamezone/widgets/common/custom_search_bar.dart';
+import 'package:gamezone/widgets/common/status_badge.dart';
+import 'users_detail_page.dart';
 
 // Halaman daftar verifikasi untuk meninjau pengajuan game station.
 class VerifyPage extends StatefulWidget {
@@ -137,51 +137,14 @@ class _VerifyPageState extends State<VerifyPage> {
   Widget _buildSearchBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-      child: Container(
-        height: 48,
-        decoration: BoxDecoration(
-          color: AppColors.secondaryDark.withValues(alpha: 0.8),
-          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-          border: Border.all(
-            color: AppColors.white.withValues(alpha: 0.08),
-            width: 1.1,
-          ),
-        ),
-        child: TextField(
-          controller: _searchController,
-          style: AppTextStyle.body2.copyWith(color: AppColors.white),
-          onChanged: (value) {
-            setState(() {
-              _searchQuery = value.trim().toLowerCase();
-            });
-          },
-          decoration: InputDecoration(
-            hintText: 'Cari nama station, pemilik, email, nomor HP...',
-            hintStyle: AppTextStyle.body3.copyWith(color: AppColors.softGray),
-            prefixIcon: const Icon(
-              Icons.search_rounded,
-              color: AppColors.softGray,
-              size: 20,
-            ),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: AppColors.softGray,
-                      size: 18,
-                    ),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() {
-                        _searchQuery = '';
-                      });
-                    },
-                  )
-                : null,
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-          ),
-        ),
+      child: CustomSearchBar(
+        controller: _searchController,
+        hintText: 'Cari nama station, pemilik, email, nomor HP...',
+        onChanged: (value) {
+          setState(() {
+            _searchQuery = value.trim().toLowerCase();
+          });
+        },
       ),
     );
   }
@@ -425,24 +388,7 @@ class _VerifyPageState extends State<VerifyPage> {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF141B31),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  statusText,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              StatusBadge(label: statusText, color: statusColor),
             ],
           ),
 
@@ -505,14 +451,12 @@ class _VerifyPageState extends State<VerifyPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => VerifyDetailPage(
+                  builder: (context) => UsersDetailPage(
                     stationId: stationId,
                     ownerId: ownerId,
                     data: data,
                     photos: photos,
                     documents: data['buktiLegalitas'] ?? [],
-                    onApprove: _approveStation,
-                    onReject: _rejectStation,
                   ),
                 ),
               );
@@ -549,52 +493,6 @@ class _VerifyPageState extends State<VerifyPage> {
     required String title,
     required String subtitle,
   }) {
-    // Menggunakan top alignment dan scrollable view dengan top padding
-    // agar layout tetap stabil dan tidak terdorong/jumping saat keyboard muncul.
-    return Align(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(
-          top: 120,
-          left: 40,
-          right: 40,
-          bottom: 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: const Color(0xFF22D3EE), size: 40),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 12,
-                height: 1.45,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return CustomEmptyState(icon: icon, title: title, subtitle: subtitle);
   }
 }

@@ -13,6 +13,8 @@ import 'package:gamezone/widgets/admin/admin_bottom_navbar.dart';
 import 'package:gamezone/widgets/admin/admin_header.dart';
 import 'package:gamezone/widgets/admin/unit_card.dart';
 import 'package:gamezone/utils/helpers.dart';
+import 'package:gamezone/widgets/common/custom_empty_state.dart';
+import 'package:gamezone/widgets/common/custom_search_bar.dart';
 // util widgets are used in extracted widgets
 
 /// Halaman pengelolaan unit milik station aktif admin.
@@ -889,50 +891,10 @@ class _RoomPageState extends State<RoomPage> {
     required String title,
     required String subtitle,
   }) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(
-          top: 60,
-          left: 40,
-          right: 40,
-          bottom: 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF22D3EE).withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: const Color(0xFF22D3EE), size: 40),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 12,
-                height: 1.45,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return CustomEmptyState(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
     );
   }
 
@@ -1161,53 +1123,14 @@ class _RoomPageState extends State<RoomPage> {
       children: [
         // Search Bar untuk pencarian namaUnit, noPC, atau jenisRoom secara realtime.
         Expanded(
-          child: Container(
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.secondaryDark.withValues(alpha: 0.8),
-              borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-              border: Border.all(
-                color: AppColors.white.withValues(alpha: 0.08),
-                width: 1.1,
-              ),
-            ),
-            child: TextField(
-              controller: _searchController,
-              style: AppTextStyle.body2.copyWith(color: AppColors.white),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value.trim().toLowerCase();
-                });
-              },
-              decoration: InputDecoration(
-                hintText: 'Cari nama, no PC, atau jenis room...',
-                hintStyle: AppTextStyle.body3.copyWith(
-                  color: AppColors.softGray,
-                ),
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  color: AppColors.softGray,
-                  size: 20,
-                ),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(
-                          Icons.close_rounded,
-                          color: AppColors.softGray,
-                          size: 18,
-                        ),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchQuery = '';
-                          });
-                        },
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
+          child: CustomSearchBar(
+            controller: _searchController,
+            hintText: 'Cari nama, no PC, atau jenis room...',
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value.trim().toLowerCase();
+              });
+            },
           ),
         ),
         const SizedBox(width: 8),
