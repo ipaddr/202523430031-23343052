@@ -481,10 +481,16 @@ class _BookingFormPageState extends State<BookingFormPage> {
     final String unitId = _unitId;
     if (unitId.isNotEmpty) {
       try {
-        final DocumentSnapshot unitSnap = await _firestoreService.getUnitById(unitId);
+        final DocumentSnapshot unitSnap = await _firestoreService.getUnitById(
+          unitId,
+        );
         if (unitSnap.exists) {
-          final Map<String, dynamic> currentUnitData = unitSnap.data() as Map<String, dynamic>? ?? {};
-          final String currentStatus = (currentUnitData['status'] ?? '').toString().trim().toLowerCase();
+          final Map<String, dynamic> currentUnitData =
+              unitSnap.data() as Map<String, dynamic>? ?? {};
+          final String currentStatus = (currentUnitData['status'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
           if (currentStatus == 'perawatan' ||
               currentStatus == 'maintenance' ||
               currentStatus == 'tidak_aktif' ||
@@ -530,8 +536,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
           .first;
       final userData = userSnap.data() as Map<String, dynamic>? ?? {};
 
-      final String userName =
-          userData['nama'] ?? 'Gamers';
+      final String userName = userData['nama'] ?? 'Gamers';
       final String userFoto = userData['foto'] ?? '';
 
       final int pricePerJam = _unitData['hargaPerJam'] is int
@@ -542,8 +547,12 @@ class _BookingFormPageState extends State<BookingFormPage> {
       final int totalHarga = (durationHours * pricePerJam).toInt();
       final int durasiJam = durationHours.ceil();
 
+      // Ambil namaStation dari data station (Firestore stations/{stationId}),
+      // bukan dari unitData yang tidak menyimpan field namaStation.
       final String namaStation =
-          _unitData['namaStation']?.toString() ?? 'Game Station';
+          _stationData?['namaStation']?.toString() ??
+          _unitData['namaStation']?.toString() ??
+          'Game Station';
       final String namaUnit = _unitData['namaUnit']?.toString() ?? 'Unit';
       final String tanggalBooking = _formatDateToDb(_selectedDate!);
       final String jamMulai = _formatTimeOfDay(_selectedTime!);
@@ -1201,4 +1210,3 @@ class _BookingFormPageState extends State<BookingFormPage> {
     );
   }
 }
-
