@@ -365,7 +365,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Header ─────────────────────────────────────────────────────────────────
+  // Header
 
   Widget _buildHeader() {
     return Padding(
@@ -404,7 +404,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Status Badge ────────────────────────────────────────────────────────────
+  // Status Badge
 
   Widget _buildStatusBadge() {
     final Color badgeColor = _isExpired
@@ -419,7 +419,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Total Card ──────────────────────────────────────────────────────────────
+  // Total Card
 
   Widget _buildTotalCard(int totalHarga, String bookingId) {
     return Container(
@@ -465,7 +465,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── QRIS Card ───────────────────────────────────────────────────────────────
+  // QRIS Card
 
   Widget _buildQrisCard() {
     return Container(
@@ -546,7 +546,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Payment Methods ─────────────────────────────────────────────────────────
+  // Payment Methods
 
   Widget _buildPaymentMethods() {
     return Column(
@@ -658,7 +658,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Bottom Bar ──────────────────────────────────────────────────────────────
+  // Bottom Bar
 
   Widget _buildBottomBar() {
     return Container(
@@ -738,3 +738,4 @@ class _PaymentMethod {
     required this.icon,
   });
 }
+

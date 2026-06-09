@@ -67,7 +67,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
       resizeToAvoidBottomInset: true,
       body: GameZoneBackground(
         child: SafeArea(
-          // Area konten utama tanpa memotong background navbar di bawah.
+
           bottom: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,12 +127,15 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SuperAdminSheetHeader(title: 'Pendaftaran Admin Baru'),
+              SuperAdminSheetHeader(title: 'Notifikasi Super Admin'),
               const SizedBox(height: 16),
-              // Daftar Notifikasi Khusus Admin Game Station
+              // Daftar Notifikasi Khusus Super Admin
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
-                  stream: _firestoreService.getPendingAdminsStream(),
+                  stream: FirebaseFirestore.instance
+                      .collection('notifications')
+                      .where('roleTarget', isEqualTo: 'superadmin')
+                      .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(
@@ -145,7 +148,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                       return const Center(
                         child: Text(
-                          'Belum ada pendaftaran admin baru.',
+                          'Belum ada notifikasi baru.',
                           style: TextStyle(color: Color(0xFF64748B)),
                         ),
                       );
@@ -156,16 +159,43 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                       final data = doc.data() as Map<String, dynamic>;
                       final Timestamp? createdAt =
                           data['createdAt'] as Timestamp?;
-                      final String nama = data['nama'] ?? 'Admin';
-                      final String email = data['email'] ?? '';
+                      final String title = data['title'] ?? '';
+                      final String message = data['message'] ?? '';
+                      final String type = data['type'] ?? '';
+
+                      IconData icon = Icons.notifications_none_rounded;
+                      Color iconColor = const Color(0xFF22D3EE);
+                      String category = 'Sistem';
+
+                      if (type == 'admin_registered') {
+                        icon = Icons.admin_panel_settings_rounded;
+                        iconColor = const Color(0xFFC084FC);
+                        category = 'Pendaftaran';
+                      } else if (type == 'admin_verified') {
+                        icon = Icons.check_circle_rounded;
+                        iconColor = const Color(0xFF10B981);
+                        category = 'Verifikasi';
+                      } else if (type == 'admin_rejected') {
+                        icon = Icons.cancel_rounded;
+                        iconColor = const Color(0xFFEF4444);
+                        category = 'Penolakan';
+                      } else if (type == 'station_first_booking') {
+                        icon = Icons.star_rounded;
+                        iconColor = const Color(0xFFF59E0B);
+                        category = 'Booking';
+                      } else if (type == 'low_rating_alert') {
+                        icon = Icons.warning_amber_rounded;
+                        iconColor = const Color(0xFFEF4444);
+                        category = 'Laporan';
+                      }
 
                       activities.add({
-                        'title': 'Admin Game Station Terdaftar',
-                        'subtitle': 'Admin "$nama" ($email) telah mendaftar',
+                        'title': title,
+                        'subtitle': message,
                         'timestamp': createdAt,
-                        'categoryText': 'Mitra',
-                        'icon': Icons.admin_panel_settings_rounded,
-                        'iconColor': const Color(0xFFC084FC),
+                        'categoryText': category,
+                        'icon': icon,
+                        'iconColor': iconColor,
                       });
                     }
 
@@ -180,9 +210,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                     });
 
                     return ListView.builder(
-                      itemCount: activities.length > 10
-                          ? 10
-                          : activities.length,
+                      itemCount: activities.length,
                       itemBuilder: (context, idx) {
                         final act = activities[idx];
                         return SuperAdminActivityItem(
@@ -616,3 +644,4 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
     }
   }
 }
+

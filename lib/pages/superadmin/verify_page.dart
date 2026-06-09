@@ -496,3 +496,4 @@ class _VerifyPageState extends State<VerifyPage> {
     return CustomEmptyState(icon: icon, title: title, subtitle: subtitle);
   }
 }
+

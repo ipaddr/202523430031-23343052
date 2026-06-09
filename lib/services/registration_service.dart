@@ -80,8 +80,6 @@ class RegistrationService {
   }
 
   // Mendaftarkan user biasa ke Auth dan Firestore.
-  // Satu email = satu akun. Jika email sudah ada di Firebase Auth
-  // (via Google), password provider di-link ke akun yang sama.
   Future<void> registerRegularUser({
     required String name,
     required String email,
@@ -97,7 +95,8 @@ class RegistrationService {
       );
 
       await credential.user?.updateDisplayName(name);
-      // Akun baru — buat dokumen Firestore
+      
+      // Akun baru — buat dokumen Firestore langsung pada users/{uid}
       await _firestoreService.createUser(credential.user!.uid, {
         'nama': name,
         'email': email,
@@ -109,61 +108,10 @@ class RegistrationService {
       });
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
-        // Email sudah ada di Firebase Auth — kemungkinan akun Google.
-        // Strategi: sign in Google dulu → link password provider.
-        // Tapi kita tidak bisa sign in Google di sini tanpa UI.
-        //
-        // Alternatif yang bisa dilakukan tanpa memunculkan Google picker:
-        // Cek apakah password provider sudah ada dengan mencoba sign in.
-        try {
-          final existing = await _authService.signInWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
-
-          // Password provider sudah ada dan cocok.
-          // Pastikan dokumen Firestore tersedia dengan data terbaru.
-          await existing.user?.updateDisplayName(name);
-          final firestoreData = await _firestoreService.getUserData(
-            existing.user!.uid,
-          );
-          if (firestoreData == null) {
-            // Dokumen belum ada — buat sekarang
-            await _firestoreService.createUser(existing.user!.uid, {
-              'nama': name,
-              'email': email,
-              'noHp': phone,
-              'foto': existing.user?.photoURL ?? '',
-              'role': 'user',
-              'status': 'active',
-              'createdAt': FieldValue.serverTimestamp(),
-            });
-          } else {
-            // Update noHp dan nama jika berubah
-            await _firestoreService.updateUser(existing.user!.uid, {
-              'nama': name,
-              'noHp': phone,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-          await _authService.signOut();
-          return;
-        } on FirebaseAuthException catch (signInErr) {
-          if (signInErr.code == 'invalid-credential' ||
-              signInErr.code == 'wrong-password' ||
-              signInErr.code == 'user-not-found') {
-            // Email ada tapi password tidak cocok → akun via Google tanpa password.
-            // Arahkan user untuk login Google dulu, lalu password bisa di-link.
-            throw FirebaseAuthException(
-              code: 'email-google-no-password',
-              message:
-                  'Email $email sudah terdaftar via Google. '
-                  'Silakan login menggunakan tombol Google terlebih dahulu. '
-                  'Setelah login, Anda bisa mengatur password melalui profil.',
-            );
-          }
-          rethrow;
-        }
+        throw FirebaseAuthException(
+          code: 'email-already-in-use',
+          message: 'Email sudah terdaftar. Silakan gunakan email lain.',
+        );
       }
       if (credential?.user != null) {
         await _deleteCreatedUser(credential!.user);
@@ -236,6 +184,25 @@ class RegistrationService {
           'createdAt': FieldValue.serverTimestamp(),
         },
       );
+
+      // Kirim notifikasi admin_registered ke Superadmin
+      try {
+        final superadminNotifId = FirebaseFirestore.instance.collection('notifications').doc().id;
+        await FirebaseFirestore.instance.collection('notifications').doc(superadminNotifId).set({
+          'userId': 'superadmin',
+          'targetId': 'superadmin',
+          'roleTarget': 'superadmin',
+          'stationId': uid,
+          'bookingId': '',
+          'type': 'admin_registered',
+          'title': 'Admin Baru Mendaftar',
+          'message': 'Terdapat pendaftaran Game Station baru.',
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        debugPrint('Error sending admin_registered notification to superadmin: $e');
+      }
 
       await _authService.signOut();
     } catch (e) {

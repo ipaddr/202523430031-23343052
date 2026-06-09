@@ -172,7 +172,6 @@ class _AiPageState extends State<AiPage> {
           padding: EdgeInsets.only(bottom: bottomPadding),
           child: Column(
             children: [
-              // Area chat memenuhi layar
               Expanded(
                 child: _messages.isEmpty
                     ? _buildEmptyState()
@@ -196,7 +195,6 @@ class _AiPageState extends State<AiPage> {
                       ),
               ),
 
-              // Input area dengan style SearchBar
               _buildInputArea(),
             ],
           ),
@@ -205,7 +203,6 @@ class _AiPageState extends State<AiPage> {
     );
   }
 
-  // ─── Empty State ───────────────────────────────────────────────────────────
   Widget _buildEmptyState() {
     return Center(
       child: SingleChildScrollView(
@@ -214,7 +211,6 @@ class _AiPageState extends State<AiPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Ikon besar
             Container(
               width: 80,
               height: 80,
@@ -254,7 +250,6 @@ class _AiPageState extends State<AiPage> {
             ),
             const SizedBox(height: 28),
 
-            // Contoh pertanyaan
             _buildExampleChip('Game apa yang cocok untuk 4 orang?'),
             const SizedBox(height: 8),
             _buildExampleChip('Rekomendasi game FPS terbaik?'),
@@ -304,7 +299,6 @@ class _AiPageState extends State<AiPage> {
     );
   }
 
-  // ─── Bubble Chat ───────────────────────────────────────────────────────────
   Widget _buildMessageBubble(_ChatMessage message, {String? userPhotoUrl}) {
     if (message.isQuotaError) {
       return _buildAiStatusCard(message.text);
@@ -321,7 +315,6 @@ class _AiPageState extends State<AiPage> {
         mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar AI
           if (!isUser) ...[
             Container(
               width: 36,
@@ -345,7 +338,6 @@ class _AiPageState extends State<AiPage> {
             ),
             const SizedBox(width: 10),
           ],
-          // Bubble teks
           Flexible(
             child: Align(
               alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -403,7 +395,6 @@ class _AiPageState extends State<AiPage> {
               ),
             ),
           ),
-          // Avatar User
           if (isUser) ...[
             const SizedBox(width: 10),
             CustomUserAvatar(
@@ -417,7 +408,6 @@ class _AiPageState extends State<AiPage> {
     );
   }
 
-  // Tampilkan card status AI khusus quota error
   Widget _buildAiStatusCard(String errorMessage) {
     return Center(
       child: Container(
@@ -456,7 +446,6 @@ class _AiPageState extends State<AiPage> {
     );
   }
 
-  // Tampilkan card kecil error style
   Widget _buildErrorCard(String errorMessage) {
     return Center(
       child: Container(
@@ -495,7 +484,6 @@ class _AiPageState extends State<AiPage> {
     );
   }
 
-  // Bubble loading (titik animasi)
   Widget _buildLoadingBubble() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -545,7 +533,6 @@ class _AiPageState extends State<AiPage> {
     );
   }
 
-  // ─── Input Area ─────────────────────────────────────────────────────────────
   Widget _buildInputArea() {
     final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     return Container(
@@ -561,7 +548,6 @@ class _AiPageState extends State<AiPage> {
       ),
       child: Row(
         children: [
-          // TextField dengan style SearchBar GameZone
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -597,7 +583,6 @@ class _AiPageState extends State<AiPage> {
           ),
           const SizedBox(width: 12),
 
-          // Tombol Kirim berukuran proporsional, style tombol aplikasi
           GestureDetector(
             onTap: (_isLoading || _cooldownSeconds > 0) ? null : _sendMessage,
             child: AnimatedContainer(
@@ -653,7 +638,6 @@ class _AiPageState extends State<AiPage> {
   }
 }
 
-// ─── Typing Indicator (3 titik animasi) ────────────────────────────────────
 class _TypingIndicator extends StatefulWidget {
   const _TypingIndicator();
 
@@ -713,3 +697,4 @@ class _TypingIndicatorState extends State<_TypingIndicator>
     );
   }
 }
+

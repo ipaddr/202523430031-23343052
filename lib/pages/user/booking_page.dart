@@ -27,7 +27,7 @@ class _BookingPageState extends State<BookingPage> {
     'Gaming Center',
     'Esports Center',
     'Console Center',
-    'VR Center'
+    'VR Center',
   ];
 
   @override
@@ -41,7 +41,7 @@ class _BookingPageState extends State<BookingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Search & Tab Filter Section
+        // Pencarian & Tab Filter
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
           child: Column(
@@ -53,16 +53,16 @@ class _BookingPageState extends State<BookingPage> {
           ),
         ),
 
-        // Katalog Grid/List Area
+        // Area Katalog Grid/List
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: _firestoreService.getStationsByVerificationStatusStream('verified'),
+            stream: _firestoreService.getStationsByVerificationStatusStream(
+              'verified',
+            ),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.accentCyan,
-                  ),
+                  child: CircularProgressIndicator(color: AppColors.accentCyan),
                 );
               }
 
@@ -74,24 +74,34 @@ class _BookingPageState extends State<BookingPage> {
 
               // Pemetaan data mentah ke List map
               final List<Map<String, dynamic>> stations = allDocs.map((doc) {
-                final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+                final Map<String, dynamic> data =
+                    doc.data() as Map<String, dynamic>;
                 data['id'] = doc.id;
                 return data;
               }).toList();
 
-              // Filter & Search Client-Side
+              // Filter & Pencarian Sisi Klien
               final filteredStations = stations.where((station) {
                 // 1. Filter Tab (jenis)
-                final String jenis = station['jenis']?.toString().toLowerCase() ?? '';
-                if (_selectedTab != 'Semua' && jenis != _selectedTab.toLowerCase()) {
+                final String jenis =
+                    station['jenis']?.toString().toLowerCase() ?? '';
+                if (_selectedTab != 'Semua' &&
+                    jenis != _selectedTab.toLowerCase()) {
                   return false;
                 }
 
-                // 2. Search Query
+                // 2. Query Pencarian
                 if (_searchQuery.isNotEmpty) {
-                  final String name = (station['namaStation'] ?? station['stationName'] ?? '').toString().toLowerCase();
-                  final String alamat = (station['alamat'] ?? '').toString().toLowerCase();
-                  final String stationJenis = (station['jenis'] ?? '').toString().toLowerCase();
+                  final String name =
+                      (station['namaStation'] ?? station['stationName'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                  final String alamat = (station['alamat'] ?? '')
+                      .toString()
+                      .toLowerCase();
+                  final String stationJenis = (station['jenis'] ?? '')
+                      .toString()
+                      .toLowerCase();
 
                   final bool matchesName = name.contains(_searchQuery);
                   final bool matchesAlamat = alamat.contains(_searchQuery);
@@ -107,8 +117,12 @@ class _BookingPageState extends State<BookingPage> {
 
               // Urutkan berdasarkan rating tertinggi secara default
               filteredStations.sort((a, b) {
-                final double ratingA = (a['rating'] is num) ? (a['rating'] as num).toDouble() : 0.0;
-                final double ratingB = (b['rating'] is num) ? (b['rating'] as num).toDouble() : 0.0;
+                final double ratingA = (a['rating'] is num)
+                    ? (a['rating'] as num).toDouble()
+                    : 0.0;
+                final double ratingB = (b['rating'] is num)
+                    ? (b['rating'] as num).toDouble()
+                    : 0.0;
                 return ratingB.compareTo(ratingA);
               });
 
@@ -144,7 +158,7 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  // ─── Search Bar Widget ───────────────────────────────────────────────────────
+  // Widget Search Bar
   Widget _buildSearchBar() {
     return CustomSearchBar(
       controller: _searchController,
@@ -157,7 +171,7 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  // ─── Tab Filter Widget ───────────────────────────────────────────────────────
+  // Widget Tab Filter
   Widget _buildTabFilter() {
     return SizedBox(
       height: 38,
@@ -220,23 +234,32 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  // ─── Card Game Station Widget (Desain identik dashboard) ────────────────────
+  // Widget Kartu Game Station (Desain identik dashboard)
   Widget _buildStationCard(Map<String, dynamic> station) {
     final String name = station['namaStation'] ?? 'Game Station';
     final String alamat = station['alamat'] ?? 'Alamat tidak tersedia';
 
-    final bool hasRating = station['rating'] != null && (station['rating'] is num) && (station['rating'] as num) > 0;
-    final double rating = hasRating ? (station['rating'] as num).toDouble() : 0.0;
+    final bool hasRating =
+        station['rating'] != null &&
+        (station['rating'] is num) &&
+        (station['rating'] as num) > 0;
+    final double rating = hasRating
+        ? (station['rating'] as num).toDouble()
+        : 0.0;
 
     final dynamic totalReview = station['totalReview'];
-    final String reviewText = (totalReview != null && totalReview != 0) ? '$totalReview Review' : 'Belum ada review';
+    final String reviewText = (totalReview != null && totalReview != 0)
+        ? '$totalReview Review'
+        : 'Belum ada review';
 
     // Ambil foto
     String fotoUrl = '';
     final fotoData = station['foto'];
     if (fotoData is String && fotoData.trim().isNotEmpty) {
       fotoUrl = fotoData.trim();
-    } else if (fotoData is List && fotoData.isNotEmpty && fotoData.first != null) {
+    } else if (fotoData is List &&
+        fotoData.isNotEmpty &&
+        fotoData.first != null) {
       fotoUrl = fotoData.first.toString().trim();
     }
 
@@ -281,14 +304,18 @@ class _BookingPageState extends State<BookingPage> {
                     ? Image.network(
                         fotoUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, err, stack) => _buildPlaceholderImage(),
+                        errorBuilder: (context, err, stack) =>
+                            _buildPlaceholderImage(),
                       )
                     : _buildPlaceholderImage(),
               ),
-              // Detail Info
+              // Info Detail
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -309,7 +336,7 @@ class _BookingPageState extends State<BookingPage> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // Rating & Review Stack
+                          // Tumpukan Rating & Ulasan
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
@@ -323,7 +350,9 @@ class _BookingPageState extends State<BookingPage> {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    hasRating ? rating.toStringAsFixed(1) : 'Belum ada rating',
+                                    hasRating
+                                        ? rating.toStringAsFixed(1)
+                                        : 'Belum ada rating',
                                     style: AppTextStyle.caption1.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -394,17 +423,13 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  // ─── Empty & Error States Widget ─────────────────────────────────────────────
+  // Widget State Kosong & Error
   Widget _buildEmptyState({
     required String title,
     required String description,
     required IconData icon,
   }) {
-    return CustomEmptyState(
-      icon: icon,
-      title: title,
-      subtitle: description,
-    );
+    return CustomEmptyState(icon: icon, title: title, subtitle: description);
   }
 
   Widget _buildErrorState(String message) {

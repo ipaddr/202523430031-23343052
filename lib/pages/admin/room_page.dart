@@ -15,7 +15,7 @@ import 'package:gamezone/widgets/admin/unit_card.dart';
 import 'package:gamezone/utils/helpers.dart';
 import 'package:gamezone/widgets/common/custom_empty_state.dart';
 import 'package:gamezone/widgets/common/custom_search_bar.dart';
-// util widgets are used in extracted widgets
+// util widget digunakan di widget yang diekstrak
 
 /// Halaman pengelolaan unit milik station aktif admin.
 class RoomPage extends StatefulWidget {
@@ -216,13 +216,12 @@ class _RoomPageState extends State<RoomPage> {
         normalizedType == 'esports_center';
   }
 
-  // Aksi Unit
   Future<void> _confirmDeleteUnit(
     BuildContext context,
     String unitId,
     String unitName,
   ) async {
-    // Capture ScaffoldMessenger early to avoid using BuildContext across async gaps.
+    // Ambil ScaffoldMessenger lebih awal agar tidak menggunakan BuildContext lintas async.
     final messenger = ScaffoldMessenger.of(context);
 
     final bool? confirmed = await showDialog<bool>(
@@ -377,10 +376,12 @@ class _RoomPageState extends State<RoomPage> {
               ),
               const SizedBox(height: 16),
               Expanded(
-                child: FutureBuilder<QuerySnapshot>(
-                  future: _firestoreService.getStationBookingNotificationsOnce(
-                    stationId,
-                  ),
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('notifications')
+                      .where('roleTarget', isEqualTo: 'admin')
+                      .where('stationId', isEqualTo: stationId)
+                      .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(
@@ -433,28 +434,10 @@ class _RoomPageState extends State<RoomPage> {
                       itemCount: docs.length > 20 ? 20 : docs.length,
                       itemBuilder: (context, index) {
                         final data = docs[index].data() as Map<String, dynamic>;
-                        final String customerName =
-                            readFirstString(data, const [
-                              'namaUser',
-                              'userName',
-                              'nama',
-                              'name',
-                            ]) ??
-                            'Pelanggan';
-                        final String unitName =
-                            data['namaUnit']?.toString() ?? 'Unit';
-                        final String totalText = _formatCurrency(
-                          _readFirstInt(data, const [
-                            'totalPemasukan',
-                            'totalPrice',
-                            'totalHarga',
-                            'amount',
-                            'price',
-                            'biaya',
-                            'nominal',
-                            'total',
-                          ]),
-                        );
+                        final String title =
+                            data['title']?.toString() ?? 'Booking';
+                        final String message =
+                            data['message']?.toString() ?? '';
                         final Timestamp? createdAt =
                             data['createdAt'] as Timestamp?;
 
@@ -496,7 +479,7 @@ class _RoomPageState extends State<RoomPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '$customerName memesan $unitName',
+                                      title,
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 14,
@@ -505,9 +488,7 @@ class _RoomPageState extends State<RoomPage> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      totalText.isNotEmpty
-                                          ? 'Total $totalText'
-                                          : 'Booking baru masuk',
+                                      message,
                                       style: const TextStyle(
                                         color: Color(0xFF94A3B8),
                                         fontSize: 11,
@@ -553,25 +534,6 @@ class _RoomPageState extends State<RoomPage> {
     );
   }
 
-  int _readFirstInt(Map<String, dynamic> data, List<String> keys) {
-    for (final key in keys) {
-      final value = data[key];
-      if (value is int) return value;
-      if (value is double) return value.toInt();
-      if (value is num) return value.toInt();
-      if (value != null) {
-        final parsed = int.tryParse(value.toString());
-        if (parsed != null) return parsed;
-      }
-    }
-    return 0;
-  }
-
-  String _formatCurrency(int value) {
-    if (value <= 0) return '';
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match match) => '${match[1]}.')}';
-  }
-
   String _formatRelativeTime(Timestamp? timestamp) {
     if (timestamp == null) return 'Baru saja';
     final DateTime dateTime = timestamp.toDate();
@@ -590,11 +552,9 @@ class _RoomPageState extends State<RoomPage> {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
   }
 
-  // Unit helpers moved to widgets/utils.dart: use `readUnitType`,
   // `readUnitStatus`, `readFirstString`, `isPcType`, `isRoomType`,
-  // `isAvailableStatus`, and `isFullStatus`.
+  // `isAvailableStatus`, dan `isFullStatus`.
 
-  // Int helper moved to UnitCard widget where needed.
   String _unitName(Map<String, dynamic> data) {
     return data['namaUnit']?.toString() ?? 'Unit';
   }
@@ -891,11 +851,7 @@ class _RoomPageState extends State<RoomPage> {
     required String title,
     required String subtitle,
   }) {
-    return CustomEmptyState(
-      icon: icon,
-      title: title,
-      subtitle: subtitle,
-    );
+    return CustomEmptyState(icon: icon, title: title, subtitle: subtitle);
   }
 
   Widget _buildContentArea(BuildContext context, _RoomPageData pageData) {
@@ -922,8 +878,6 @@ class _RoomPageState extends State<RoomPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header Admin. Only show when not nested inside AdminDashboard
-        // Header
         if (!widget.isNestedTab)
           AdminHeader(
             currentUser: pageData.currentUser,
@@ -975,7 +929,6 @@ class _RoomPageState extends State<RoomPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 children: [
-                  // Statistik Unit
                   _buildTopSummaryCard(
                     context,
                     summary,
@@ -983,12 +936,10 @@ class _RoomPageState extends State<RoomPage> {
                     stationType,
                   ),
                   const SizedBox(height: 16),
-                  // Daftar Ruangan header
                   _buildSectionTitle(title: 'Daftar Ruangan'),
                   const SizedBox(height: 12),
                   _buildFilterAndSearchSection(),
                   const SizedBox(height: 16),
-                  // Memproses data unit dari stream utama
                   Builder(
                     builder: (context) {
                       final List<_UnitEntry> filteredUnits =
@@ -1011,7 +962,6 @@ class _RoomPageState extends State<RoomPage> {
                         );
                       }
 
-                      // Menampilkan daftar unit yang telah difilter
                       return Column(
                         children: filteredUnits
                             .map(
@@ -1088,11 +1038,9 @@ class _RoomPageState extends State<RoomPage> {
     );
 
     if (widget.isNestedTab) {
-      // Konten halaman
       return mainContent;
     }
 
-    // Background utama halaman
     return Scaffold(
       backgroundColor: Colors.transparent,
       // Mengaktifkan resize agar konten utama menyesuaikan tinggi di atas keyboard
@@ -1118,10 +1066,8 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   Widget _buildFilterAndSearchSection() {
-    // Search
     return Row(
       children: [
-        // Search Bar untuk pencarian namaUnit, noPC, atau jenisRoom secara realtime.
         Expanded(
           child: CustomSearchBar(
             controller: _searchController,
@@ -1134,7 +1080,6 @@ class _RoomPageState extends State<RoomPage> {
           ),
         ),
         const SizedBox(width: 8),
-        // Tombol filter/sort dengan ikon garis di sebelah kanan search bar
         InkWell(
           onTap: () {
             _showFilterBottomSheet(context);
@@ -1189,7 +1134,6 @@ class _RoomPageState extends State<RoomPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Handlebar atas
                     Center(
                       child: Container(
                         width: 44,
@@ -1223,7 +1167,6 @@ class _RoomPageState extends State<RoomPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 1. Bagian Urutkan
                     Text(
                       'Urutkan',
                       style: AppTextStyle.body1.copyWith(
@@ -1299,7 +1242,6 @@ class _RoomPageState extends State<RoomPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 2. Filter Jenis Unit
                     Text(
                       'Jenis Unit',
                       style: AppTextStyle.body1.copyWith(
@@ -1327,7 +1269,6 @@ class _RoomPageState extends State<RoomPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 3. Filter Status
                     Text(
                       'Status Unit',
                       style: AppTextStyle.body1.copyWith(
@@ -1345,8 +1286,9 @@ class _RoomPageState extends State<RoomPage> {
                             'Tersedia',
                             'Digunakan',
                             'Perawatan',
+                            'Tidak Tersedia',
                           ].map((String status) {
-                            // DB mapping for display
+                            // Pemetaan nilai DB ke label tampilan
                             final String displayStatus = status == 'Semua'
                                 ? 'Semua Status'
                                 : status;
@@ -1364,7 +1306,6 @@ class _RoomPageState extends State<RoomPage> {
                           }).toList(),
                     ),
 
-                    // 4. Filter Jenis Room (Hanya tampil jika jenis unit = Room)
                     if (_selectedType == 'Room') ...[
                       const SizedBox(height: 16),
                       Text(
@@ -1408,7 +1349,6 @@ class _RoomPageState extends State<RoomPage> {
 
                     const SizedBox(height: 24),
 
-                    // Tombol Aksi
                     Row(
                       children: [
                         Expanded(
@@ -1427,7 +1367,6 @@ class _RoomPageState extends State<RoomPage> {
                               ),
                             ),
                             onPressed: () {
-                              // Reset semua filter
                               setState(() {
                                 _selectedSort = 'Terbaru';
                                 _selectedType = 'Semua';
@@ -1467,7 +1406,6 @@ class _RoomPageState extends State<RoomPage> {
                                 ),
                               ),
                               onPressed: () {
-                                // Terapkan filter & pemicu pembaruan UI di halaman utama
                                 setState(() {});
                                 Navigator.pop(context);
                               },
@@ -1528,7 +1466,6 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   List<_UnitEntry> _filterAndSearchUnits(List<_UnitEntry> entries) {
-    // Proses pencarian data secara realtime dan filter client-side
     final List<_UnitEntry> filtered = entries.where((entry) {
       final data = entry.data;
       final String namaUnit = data['namaUnit']?.toString().toLowerCase() ?? '';
@@ -1538,7 +1475,6 @@ class _RoomPageState extends State<RoomPage> {
       final String jenisRoom =
           data['jenisRoom']?.toString().toLowerCase() ?? '';
 
-      // 1. Search Query
       if (_searchQuery.isNotEmpty) {
         final bool matchesName = namaUnit.contains(_searchQuery);
         final bool matchesNoPc = noPc.contains(_searchQuery);
@@ -1548,7 +1484,6 @@ class _RoomPageState extends State<RoomPage> {
         }
       }
 
-      // 2. Type Filter
       if (_selectedType == 'PC' && type != 'pc') {
         return false;
       }
@@ -1556,7 +1491,6 @@ class _RoomPageState extends State<RoomPage> {
         return false;
       }
 
-      // 3. Status Filter
       if (_selectedStatus == 'Tersedia' && status != 'tersedia') {
         return false;
       }
@@ -1566,8 +1500,10 @@ class _RoomPageState extends State<RoomPage> {
       if (_selectedStatus == 'Perawatan' && status != 'perawatan') {
         return false;
       }
+      if (_selectedStatus == 'Tidak Tersedia' && status != 'tidak_aktif') {
+        return false;
+      }
 
-      // 4. Jenis Room Filter (hanya jika tipe yang dipilih room)
       if (_selectedType == 'Room' && _selectedJenisRoom != 'Semua Room') {
         if (jenisRoom != _selectedJenisRoom.toLowerCase()) {
           return false;
@@ -1577,7 +1513,6 @@ class _RoomPageState extends State<RoomPage> {
       return true;
     }).toList();
 
-    // 5. Proses sorting data secara realtime dan interactive
     if (_selectedSort == 'Nama A-Z') {
       filtered.sort((a, b) {
         final String nameA = a.data['namaUnit']?.toString().toLowerCase() ?? '';

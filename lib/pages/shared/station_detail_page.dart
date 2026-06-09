@@ -103,12 +103,8 @@ class _StationDetailPageState extends State<StationDetailPage> {
     return _StationDetailData(station: station, units: units);
   }
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
-
   String _stationName(Map<String, dynamic> d) =>
-      d['namaStation']?.toString() ??
-      d['stationName']?.toString() ??
-      'Game Station';
+      d['stationName']?.toString() ?? 'Game Station';
 
   String _stationAddress(Map<String, dynamic> d) =>
       d['alamat']?.toString() ?? 'Alamat tidak tersedia';
@@ -198,8 +194,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
     return int.tryParse(v?.toString() ?? '0') ?? 0;
   }
 
-  // ─── Navigation ─────────────────────────────────────────────────────────────
-
   void _openRoomDetail(Map<String, dynamic> unitData) {
     Navigator.pushNamed(
       context,
@@ -228,8 +222,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
   void _openManageRooms() {
     Navigator.pushNamed(context, '/admin-room');
   }
-
-  // ─── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -312,7 +304,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── Header ──────────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
           child: Row(
@@ -347,7 +338,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              // Admin: tombol Edit Station
               if (_viewMode == ViewMode.admin)
                 InkWell(
                   onTap: _openEditStation,
@@ -373,27 +363,22 @@ class _StationDetailPageState extends State<StationDetailPage> {
           ),
         ),
 
-        // ── Scrollable Content ───────────────────────────────────────────────
         Expanded(
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
             children: [
-              // Foto Station
               _buildStationImageCard(imageUrl, name, isOpen),
               const SizedBox(height: 16),
 
-              // Info Utama
               _buildInfoCard(name, address, rating, totalReview, isOpen),
               const SizedBox(height: 16),
 
-              // Jam Operasional
               if (jamOps != null) ...[
                 _buildOperationalHoursCard(jamOps),
                 const SizedBox(height: 16),
               ],
 
-              // Daftar Room / Unit
               _buildUnitsSection(units),
               const SizedBox(height: 16),
 
@@ -401,11 +386,12 @@ class _StationDetailPageState extends State<StationDetailPage> {
               _buildReviewsSection(
                 station['id']?.toString() ?? '',
                 rating,
-                totalReview is num ? totalReview.toInt() : int.tryParse(totalReview?.toString() ?? '0') ?? 0,
+                totalReview is num
+                    ? totalReview.toInt()
+                    : int.tryParse(totalReview?.toString() ?? '0') ?? 0,
               ),
               const SizedBox(height: 16),
 
-              // Tombol Aksi Admin
               if (_viewMode == ViewMode.admin) ...[
                 _buildAdminActions(),
                 const SizedBox(height: 8),
@@ -416,8 +402,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
       ],
     );
   }
-
-  // ─── Section Widgets ─────────────────────────────────────────────────────────
 
   Widget _buildStationImageCard(String imageUrl, String name, bool isOpen) {
     return Container(
@@ -726,7 +710,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
                   ),
                 ],
               ),
-              // Admin: tombol Kelola Room
               if (_viewMode == ViewMode.admin)
                 GestureDetector(
                   onTap: _openManageRooms,
@@ -804,7 +787,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
         ),
         child: Row(
           children: [
-            // Thumbnail
             ClipRRect(
               borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
               child: SizedBox(
@@ -822,7 +804,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
               ),
             ),
             const SizedBox(width: 12),
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -898,7 +879,11 @@ class _StationDetailPageState extends State<StationDetailPage> {
     );
   }
 
-  Widget _buildReviewsSection(String stationId, double rating, int totalReview) {
+  Widget _buildReviewsSection(
+    String stationId,
+    double rating,
+    int totalReview,
+  ) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.paddingL),
       decoration: BoxDecoration(
@@ -930,14 +915,19 @@ class _StationDetailPageState extends State<StationDetailPage> {
                     const SizedBox(height: 4),
                     Text(
                       'Ulasan dari para gamers GameZone.',
-                      style: AppTextStyle.body3.copyWith(color: AppColors.softGray),
+                      style: AppTextStyle.body3.copyWith(
+                        color: AppColors.softGray,
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.white.withValues(alpha: 0.04),
                   borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
@@ -1019,7 +1009,9 @@ class _StationDetailPageState extends State<StationDetailPage> {
                       const SizedBox(height: 8),
                       Text(
                         'Belum ada review untuk station ini',
-                        style: AppTextStyle.body3.copyWith(color: AppColors.softGray),
+                        style: AppTextStyle.body3.copyWith(
+                          color: AppColors.softGray,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -1033,7 +1025,8 @@ class _StationDetailPageState extends State<StationDetailPage> {
                 itemCount: docs.length,
                 itemBuilder: (context, index) {
                   final data = docs[index].data() as Map<String, dynamic>;
-                  final String userName = data['userName']?.toString() ?? 'Gamers';
+                  final String userName =
+                      data['userName']?.toString() ?? 'Gamers';
                   final String userPhoto = data['userPhoto']?.toString() ?? '';
                   final int rating = (data['rating'] as num?)?.toInt() ?? 5;
                   final String comment = data['comment']?.toString() ?? '';
@@ -1053,7 +1046,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Avatar User
                         CustomUserAvatar(
                           photoUrl: userPhoto.isNotEmpty ? userPhoto : null,
                           size: 36,
@@ -1066,7 +1058,8 @@ class _StationDetailPageState extends State<StationDetailPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
                                     child: Text(
@@ -1129,8 +1122,18 @@ class _StationDetailPageState extends State<StationDetailPage> {
     if (timestamp == null) return 'Baru saja';
     final DateTime date = timestamp.toDate();
     final List<String> months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agt',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
     ];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
@@ -1168,8 +1171,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
     );
   }
 }
-
-// ─── Data class ──────────────────────────────────────────────────────────────
 
 class _StationDetailData {
   final Map<String, dynamic> station;

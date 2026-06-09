@@ -21,7 +21,6 @@ class AdminStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Widget card statistik dashboard
     return Container(
       padding: const EdgeInsets.all(AppTheme.paddingL),
       decoration: BoxDecoration(
@@ -37,7 +36,6 @@ class AdminStatCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Menampilkan icon statistik
           Container(
             padding: const EdgeInsets.all(AppTheme.paddingS),
             decoration: BoxDecoration(
@@ -47,7 +45,6 @@ class AdminStatCard extends StatelessWidget {
             child: Icon(icon, color: iconColor, size: 20),
           ),
           const SizedBox(height: AppTheme.paddingL),
-          // Menampilkan judul statistik
           Text(
             title,
             maxLines: 2,
@@ -59,7 +56,6 @@ class AdminStatCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppTheme.paddingXS),
-          // Menampilkan nilai statistik
           Text(
             value,
             maxLines: 1,
@@ -88,7 +84,6 @@ class TodayBookingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Widget card booking hari ini
     return Container(
       decoration: BoxDecoration(
         gradient: Gradients.kAccent,
@@ -116,7 +111,6 @@ class TodayBookingCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Menampilkan label hari ini dan icon kalender
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -146,7 +140,6 @@ class TodayBookingCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppTheme.paddingL),
-            // Menampilkan judul booking hari ini
             Text(
               title,
               maxLines: 1,
@@ -158,7 +151,6 @@ class TodayBookingCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppTheme.paddingXS),
-            // Menampilkan jumlah booking hari ini
             Text(
               value,
               maxLines: 1,
@@ -205,7 +197,6 @@ class RevenueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Widget card pemasukan bulanan
     return Container(
       decoration: BoxDecoration(
         gradient: AppColors.gradientCyanToBlue,
@@ -233,7 +224,6 @@ class RevenueCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Menampilkan icon pemasukan dan judul card
             Row(
               children: [
                 Container(
@@ -264,7 +254,6 @@ class RevenueCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppTheme.paddingL),
-            // Menampilkan nilai rupiah
             Text(
               _formatRupiah(amount),
               maxLines: 1,
@@ -277,7 +266,6 @@ class RevenueCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppTheme.paddingS),
-            // Menampilkan deskripsi pemasukan
             Text(
               'Pemasukan terkini dari transaksi aktif',
               style: AppTextStyle.caption2.copyWith(
@@ -308,7 +296,6 @@ class RatingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Widget card rating station
     return Container(
       decoration: BoxDecoration(
         gradient: AppColors.gradientBlueToBlack,
@@ -336,7 +323,6 @@ class RatingCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Menampilkan icon rating dan judul card
             Row(
               children: [
                 Container(
@@ -367,7 +353,6 @@ class RatingCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppTheme.paddingL),
-            // Menampilkan nilai rating
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -395,7 +380,6 @@ class RatingCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppTheme.paddingS),
-            // Menampilkan deskripsi rating
             Text(
               'Skor rata-rata dari performa dan ulasan pengguna',
               style: AppTextStyle.caption2.copyWith(

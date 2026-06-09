@@ -78,7 +78,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
     }
   }
 
-  // ─── Formatting Helpers ─────────────────────────────────────────────────────
+  // Fungsi bantu untuk memformat tanggal, waktu, dan mata uang
   String _formatDate(DateTime date) {
     final List<String> days = [
       'Senin',
@@ -166,7 +166,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
     return null;
   }
 
-  // ─── Firestore Booking & Conflict Checker ────────────────────────────────────
+  // Firestore Booking & Conflict Checker
   Future<void> _fetchAndValidateBookings() async {
     if (_selectedDate == null || _selectedTime == null || _endTime == null) {
       return;
@@ -193,8 +193,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
         return data;
       }).toList();
 
-      // Filter status yang mengunci jadwal: booking yang sudah dibayar (paid) dan tidak dicancel.
-      // Booking yang belum paid (pending) TIDAK mengunci jadwal — tetap boleh bentrok/tumpang tindih saat dibuat.
+      final DateTime now = DateTime.now();
       _existingBookings = allBookings.where((booking) {
         final String statusBooking = (booking['statusBooking'] ?? '')
             .toString()
@@ -202,10 +201,48 @@ class _BookingFormPageState extends State<BookingFormPage> {
         final String statusPembayaran = (booking['statusPembayaran'] ?? '')
             .toString()
             .toLowerCase();
-        return statusPembayaran == 'paid' &&
-            statusBooking != 'cancelled' &&
-            statusBooking != 'rejected' &&
-            statusBooking != 'completed';
+
+        // 1. Halaman / Status yang dibatalkan, ditolak, selesai tidak memblokir slot
+        if (statusBooking == 'cancelled' ||
+            statusBooking == 'rejected' ||
+            statusBooking == 'completed' ||
+            statusBooking == 'expired' ||
+            statusPembayaran == 'expired' ||
+            statusPembayaran == 'cancelled') {
+          return false;
+        }
+
+        // 2. Booking yang status pembayaran 'paid' memblokir slot
+        if (statusPembayaran == 'paid') {
+          return true;
+        }
+
+        // 3. Booking pending + unpaid memblokir slot jika berumur kurang dari 15 menit
+        if (statusBooking == 'pending' && statusPembayaran == 'unpaid') {
+          final dynamic rawCreated = booking['createdAt'];
+          DateTime? createdAt;
+          if (rawCreated is Timestamp) {
+            createdAt = rawCreated.toDate();
+          } else if (rawCreated is DateTime) {
+            createdAt = rawCreated;
+          }
+          if (createdAt != null) {
+            final Duration age = now.difference(createdAt);
+            if (age.inMinutes < 15) {
+              return true;
+            }
+          }
+        }
+
+        // 4. Status lain yang aktif memblokir slot secara eksplisit
+        if (statusBooking == 'pending_confirmation' ||
+            statusBooking == 'confirmed' ||
+            statusBooking == 'active' ||
+            statusBooking == 'checkin') {
+          return true;
+        }
+
+        return false;
       }).toList();
 
       _validateSchedule();
@@ -237,6 +274,22 @@ class _BookingFormPageState extends State<BookingFormPage> {
 
     final int userStartMin = _selectedTime!.hour * 60 + _selectedTime!.minute;
     final int userEndMin = _endTime!.hour * 60 + _endTime!.minute;
+
+    // Tambahan Validasi: Hari & Jam yang sudah lewat
+    if (_selectedDate != null) {
+      final DateTime now = DateTime.now();
+      if (_selectedDate!.year == now.year &&
+          _selectedDate!.month == now.month &&
+          _selectedDate!.day == now.day) {
+        final int currentMin = now.hour * 60 + now.minute;
+        if (userStartMin < currentMin) {
+          setState(() {
+            _errorMessage = 'Jam mulai sudah lewat.';
+          });
+          return;
+        }
+      }
+    }
 
     // 2. Validasi Jam Buka / Jam Tutup Stasiun
     if (schedule != null) {
@@ -300,7 +353,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
     });
   }
 
-  // ─── Picker Actions ─────────────────────────────────────────────────────────
+  // Aksi untuk pemilih (picker) tanggal dan waktu
   Future<void> _selectDate(BuildContext context) async {
     final DateTime now = DateTime.now();
     final DateTime initialDate = _selectedDate ?? now;
@@ -395,7 +448,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
     }
   }
 
-  // ─── Submit Booking ──────────────────────────────────────────────────────────
+  // Submit Booking
   Future<void> _submitBooking() async {
     if (_selectedDate == null ||
         _selectedTime == null ||
@@ -408,8 +461,56 @@ class _BookingFormPageState extends State<BookingFormPage> {
       _isLoading = true;
     });
 
+    // Validasi ulang ketersediaan tepat sebelum submit untuk menghindari race condition
+    await _fetchAndValidateBookings();
+    if (!mounted) return;
+    if (_errorMessage != null) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_errorMessage!),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
+    // LEVEL 2 & 3: Cek status unit terbaru di Firestore sebelum booking dibuat
+    final String unitId = _unitId;
+    if (unitId.isNotEmpty) {
+      try {
+        final DocumentSnapshot unitSnap = await _firestoreService.getUnitById(unitId);
+        if (unitSnap.exists) {
+          final Map<String, dynamic> currentUnitData = unitSnap.data() as Map<String, dynamic>? ?? {};
+          final String currentStatus = (currentUnitData['status'] ?? '').toString().trim().toLowerCase();
+          if (currentStatus == 'perawatan' ||
+              currentStatus == 'maintenance' ||
+              currentStatus == 'tidak_aktif' ||
+              currentStatus == 'tidak_tersedia' ||
+              currentStatus == 'inactive') {
+            setState(() {
+              _isLoading = false;
+            });
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Unit tidak tersedia untuk dipesan.'),
+                backgroundColor: AppColors.errorRed,
+              ),
+            );
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('Gagal memverifikasi status unit: $e');
+      }
+    }
+
     final currentUser = _authService.getCurrentUser();
     if (currentUser == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Sesi telah berakhir. Silakan login kembali.'),
@@ -469,8 +570,8 @@ class _BookingFormPageState extends State<BookingFormPage> {
         'jamSelesai': jamSelesai,
         'durasiJam': durasiJam,
         'totalHarga': totalHarga,
-        'statusBooking': 'pending_confirmation',
-        'statusPembayaran': 'pending',
+        'statusBooking': 'pending',
+        'statusPembayaran': 'unpaid',
         'createdAt': Timestamp.fromDate(bookingCreatedAt),
       };
 
@@ -516,7 +617,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
     }
   }
 
-  // ─── UI Rendering ────────────────────────────────────────────────────────────
+  // UI Rendering
   @override
   Widget build(BuildContext context) {
     final int pricePerJam = _unitData['hargaPerJam'] is int
@@ -1100,3 +1201,4 @@ class _BookingFormPageState extends State<BookingFormPage> {
     );
   }
 }
+

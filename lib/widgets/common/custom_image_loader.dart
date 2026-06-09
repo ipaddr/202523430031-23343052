@@ -70,7 +70,6 @@ class CustomUserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Ikon siluet orang standard GameZone
     final Widget fallbackIcon = Center(
       child: Icon(
         Icons.person_rounded,
@@ -79,7 +78,6 @@ class CustomUserAvatar extends StatelessWidget {
       ),
     );
 
-    // Widget gambar utama dengan error fallback ke ikon siluet
     final Widget imageWidget = (photoUrl != null && photoUrl!.trim().isNotEmpty)
         ? Image.network(
             photoUrl!.trim(),
@@ -120,9 +118,7 @@ class CustomUserAvatar extends StatelessWidget {
             width: size * 0.03,
           ),
         ),
-        child: ClipOval(
-          child: imageWidget,
-        ),
+        child: ClipOval(child: imageWidget),
       ),
     );
   }

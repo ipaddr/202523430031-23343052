@@ -32,10 +32,10 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
     final currentUser = _authService.getCurrentUser();
     if (currentUser != null) {
       _firestoreService.expireOverdueBookings(currentUser.uid);
+      _firestoreService.completeFinishedBookings(userId: currentUser.uid);
     }
   }
 
-  // ─── Format Helpers ─────────────────────────────────────────────────────────
   String _formatDate(String dbDateStr) {
     try {
       final parts = dbDateStr.split('-');
@@ -72,7 +72,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
   Color _getStatusColor(String status) => bookingStatusColor(status);
   String _getStatusLabel(String status) => bookingStatusLabel(status);
 
-  // ─── Dialogs ────────────────────────────────────────────────────────────────
   void _showRatingDialog(
     String bookingId,
     String unitName,
@@ -116,7 +115,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
-                      // Bintang 1-5
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(5, (index) {
@@ -138,7 +136,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                         }),
                       ),
                       const SizedBox(height: 16),
-                      // Textfield Komentar
                       TextFormField(
                         controller: commentController,
                         style: const TextStyle(color: Colors.white, fontSize: 14),
@@ -270,21 +267,47 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
 
                         // Kirim notifikasi untuk Admin mengenai review baru
                         try {
-                          final String userName = reviewPayload['userName']?.toString() ?? 'Seorang pengguna';
-                          final String ratingStr = reviewPayload['rating']?.toString() ?? '0';
                           final adminNotifId = FirebaseFirestore.instance.collection('notifications').doc().id;
                           await FirebaseFirestore.instance.collection('notifications').doc(adminNotifId).set({
                             'userId': reviewPayload['userId'] ?? '',
+                            'targetId': reviewPayload['userId'] ?? '',
                             'roleTarget': 'admin',
+                            'stationId': stationId,
                             'title': 'Review & Rating Baru',
-                            'message': '$userName memberikan ulasan dengan rating $ratingStr bintang.',
-                            'type': 'review_added',
+                            'message': 'User memberikan rating dan review baru.',
+                            'type': 'review_received',
                             'isRead': false,
                             'relatedBookingId': bookingId,
+                            'bookingId': bookingId,
                             'createdAt': FieldValue.serverTimestamp(),
                           });
                         } catch (e) {
                           debugPrint('Error sending admin notification for review: $e');
+                        }
+
+                        // Kirim low_rating_alert ke Superadmin jika rating rata-rata stasiun turun di bawah 3.0
+                        try {
+                          // Ambil data stasiun terbaru untuk memastikan rating saat ini
+                          final stationSnap = await FirebaseFirestore.instance.collection('stations').doc(stationId).get();
+                          final double currentRating = (stationSnap.data()?['rating'] as num?)?.toDouble() ?? 0.0;
+                          if (currentRating > 0.0 && currentRating < 3.0) {
+                            final superadminNotifId = FirebaseFirestore.instance.collection('notifications').doc().id;
+                            await FirebaseFirestore.instance.collection('notifications').doc(superadminNotifId).set({
+                              'userId': 'superadmin',
+                              'targetId': 'superadmin',
+                              'roleTarget': 'superadmin',
+                              'stationId': stationId,
+                              'bookingId': bookingId,
+                              'relatedBookingId': bookingId,
+                              'type': 'low_rating_alert',
+                              'title': 'Laporan Review Buruk',
+                              'message': 'Rating station turun di bawah batas tertentu.',
+                              'isRead': false,
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
+                          }
+                        } catch (e) {
+                          debugPrint('Error sending low_rating_alert to superadmin: $e');
                         }
 
                         if (mounted) {
@@ -320,7 +343,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
     );
   }
 
-  // ─── UI Rendering ────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final currentUser = _authService.getCurrentUser();
@@ -336,13 +358,11 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Tab Filter
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
           child: _buildTabFilter(),
         ),
 
-        // Katalog/Riwayat Area
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
@@ -409,7 +429,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                 return true; // Tab Semua: tampilkan semua
               }).toList();
 
-              // Jika kosong
               if (filteredBookings.isEmpty) {
                 return _buildEmptyState();
               }
@@ -537,12 +556,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
         !isRejected &&
         !isCompleted;
 
-    // Subtitle dari data booking (tanpa FutureBuilder agar card lebih ringkas)
-    final String jenisUnit =
-        booking['jenisUnit']?.toString() ??
-        booking['jenisRoom']?.toString() ??
-        '';
-    final String subtitle = jenisUnit.isNotEmpty ? jenisUnit : namaStation;
+    final String subtitle = namaStation;
 
     return GestureDetector(
       onTap: () {
@@ -577,7 +591,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Header: nama unit + subtitle ──────────────────────────────
             Row(
               children: [
                 Expanded(
@@ -605,7 +618,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                     ],
                   ),
                 ),
-                // Chevron hint
                 const Icon(
                   Icons.chevron_right_rounded,
                   color: AppColors.softGray,
@@ -618,7 +630,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
             const Divider(color: Color(0xFF334155), height: 1),
             const SizedBox(height: 10),
 
-            // ── Info rows ─────────────────────────────────────────────────
             _buildInfoRow('Tanggal', formattedDate),
             const SizedBox(height: 6),
             _buildInfoRow('Jam Main', '$jamMulai – $jamSelesai'),
@@ -629,7 +640,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
             const Divider(color: Color(0xFF334155), height: 1),
             const SizedBox(height: 10),
 
-            // ── Status badges: 2 baris terpisah ──────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -676,7 +686,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
               ),
             ],
 
-            // ── Footer action ─────────────────────────────────────────────
             if (canPay || isCompleted || isCancelled) ...[
               const SizedBox(height: 10),
               const Divider(color: Color(0xFF334155), height: 1),
@@ -711,9 +720,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                         'jamMulai': jamMulai,
                         'jamSelesai': jamSelesai,
                         'durasiJam': durasiJam,
-                        'totalHarga': price,
-                        if (createdAtMillis != null)
-                          'createdAtMillis': createdAtMillis,
+                        'createdAtMillis': ?createdAtMillis,
                       },
                     );
                   },
@@ -779,3 +786,4 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
     );
   }
 }
+

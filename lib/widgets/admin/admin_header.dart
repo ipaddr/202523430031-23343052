@@ -114,10 +114,7 @@ class _AdminAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget avatar = CustomUserAvatar(
-      photoUrl: avatarUrl,
-      size: 52,
-    );
+    final Widget avatar = CustomUserAvatar(photoUrl: avatarUrl, size: 52);
 
     if (onTap == null) {
       return avatar;
@@ -148,7 +145,6 @@ class _NotificationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Tombol notifikasi membaca booking milik station admin aktif dari Firestore.
     if (currentUser == null) {
       return _notificationShell(notificationCount: 0, onTap: () {});
     }
@@ -176,6 +172,7 @@ class _NotificationButton extends StatelessWidget {
           stream: FirebaseFirestore.instance
               .collection('notifications')
               .where('roleTarget', isEqualTo: 'admin')
+              .where('stationId', isEqualTo: stationId ?? '')
               .snapshots(),
           builder: (context, snapshot) {
             int unreadCount = 0;
@@ -186,7 +183,8 @@ class _NotificationButton extends StatelessWidget {
                 for (final doc in snapshot.data!.docs) {
                   final data = doc.data() as Map<String, dynamic>;
                   final Timestamp? createdAt = data['createdAt'] as Timestamp?;
-                  if (createdAt != null && createdAt.toDate().isAfter(compareTime)) {
+                  if (createdAt != null &&
+                      createdAt.toDate().isAfter(compareTime)) {
                     unreadCount++;
                   }
                 }
@@ -211,7 +209,10 @@ class _NotificationButton extends StatelessWidget {
     );
   }
 
-  Widget _notificationShell({required int notificationCount, required VoidCallback onTap}) {
+  Widget _notificationShell({
+    required int notificationCount,
+    required VoidCallback onTap,
+  }) {
     return CustomNotificationButton(
       hasNotification: notificationCount > 0,
       notificationCount: notificationCount,

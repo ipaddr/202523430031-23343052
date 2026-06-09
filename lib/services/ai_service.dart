@@ -25,17 +25,17 @@ class AiService {
   /// Kirim satu pesan ke Gemini dan dapatkan respons singkat.
   /// Hanya mengirim pesan terakhir user — tidak ada riwayat, tidak ada konteks tambahan.
   Future<String> sendMessage(String userMessage) async {
-    // 1. Verifikasi API Key berhasil dibaca dan tidak kosong
     final String key = _apiKey;
     if (key.trim().isEmpty) {
       debugPrint('================ GEMINI API ERROR ================');
-      debugPrint('Error: GEMINI_API_KEY is empty or not loaded from .env file.');
+      debugPrint(
+        'Error: GEMINI_API_KEY is empty or not loaded from .env file.',
+      );
       debugPrint('Please check your root .env configuration.');
       debugPrint('==================================================');
       return 'AI sedang sibuk. Silakan coba lagi beberapa saat.';
     }
 
-    // 2. Verifikasi tidak ada request kosong
     if (userMessage.trim().isEmpty) {
       debugPrint('Gemini API Audit: Ignoring empty request.');
       return 'Pesan tidak boleh kosong.';
@@ -43,7 +43,6 @@ class AiService {
 
     final Uri uri = Uri.parse('$_baseUrl?key=$key');
 
-    // 3. Verifikasi request body sesuai format Gemini 2.0 Flash Lite (menggunakan systemInstruction camelCase)
     final Map<String, dynamic> body = {
       'systemInstruction': {
         'parts': [
@@ -59,17 +58,19 @@ class AiService {
         },
       ],
       'generationConfig': {
-        'maxOutputTokens': 800, // Ditingkatkan ke 800 agar respons lengkap tidak terpotong oleh batas token
-        'temperature': 0.6,    // Diturunkan sedikit ke 0.6 agar respon lebih konsisten dan stabil sesuai instruksi
+        'maxOutputTokens':
+            800, // Ditingkatkan ke 800 agar respons lengkap tidak terpotong oleh batas token
+        'temperature':
+            0.6, // Diturunkan sedikit ke 0.6 agar respon lebih konsisten dan stabil sesuai instruksi
       },
     };
 
-    // Obfuscate API key for safe debugging logs
+    
     final String obfuscatedKey = key.length > 8
         ? '${key.substring(0, 5)}...${key.substring(key.length - 3)}'
         : 'INVALID_KEY';
 
-    // 4. Tambahkan debug log (Model, Endpoint, API Key status, Request Body)
+    
     debugPrint('================ GEMINI API REQUEST ================');
     debugPrint('Model: $_model');
     debugPrint('Endpoint: $_baseUrl?key=$obfuscatedKey');
@@ -89,7 +90,7 @@ class AiService {
       // Cetak response body mentah untuk kebutuhan debugging dan perbandingan audit
       debugPrint('GEMINI RAW RESPONSE BODY: ${response.body}');
 
-      // 5. Tambahkan debug log (Status Code, Response Body)
+      
       debugPrint('================ GEMINI API RESPONSE ===============');
       debugPrint('Status Code: ${response.statusCode}');
       debugPrint('Response Body: ${response.body}');
@@ -127,7 +128,7 @@ class AiService {
         final String normalizedMessage = rawMessage.toLowerCase();
         final String normalizedStatus = status.toUpperCase();
 
-        // Mapping Error Sesuai Spesifikasi:
+        // Mapping kode error ke pesan yang sesuai.
         if (response.statusCode == 429 ||
             normalizedStatus == 'RESOURCE_EXHAUSTED' ||
             normalizedMessage.contains('exhausted') ||
@@ -175,7 +176,7 @@ class AiService {
   /// agar jawaban yang ditampilkan di UI berupa teks biasa yang sangat rapi.
   String _cleanMarkdown(String text) {
     if (text.isEmpty) return text;
-    
+
     return text
         // Hilangkan format bold (**text** atau __text__)
         .replaceAll('**', '')

@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/auth_service.dart';
@@ -27,6 +28,7 @@ class _LoginPageState extends State<LoginPage> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isRedirecting = false;
   String? _errorMessage;
 
   @override
@@ -49,9 +51,26 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+
+      // Cek apakah user punya google.com tapi belum ada password provider (Kasus 3)
+      List<String> methods = [];
+      try {
+        methods = await _authService.fetchSignInMethodsForEmail(email);
+      } catch (e) {
+        debugPrint('Error fetchSignInMethodsForEmail: $e');
+      }
+
+      if (methods.contains('google.com') && !methods.contains('password')) {
+        // Kasus 3: Akun Google ada, tapi belum ada password provider.
+        await _handleGoogleToEmailPasswordLink(email, password);
+        return;
+      }
+
       final credential = await _authService.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
 
       if (!mounted) {
@@ -61,6 +80,9 @@ class _LoginPageState extends State<LoginPage> {
       final userId = credential.user?.uid;
       if (userId != null) {
         final data = await _firestoreService.getUserData(userId);
+        if (!mounted) {
+          return;
+        }
         if (data != null) {
           if (data['role'] is String) {
             role = data['role'] as String;
@@ -68,6 +90,7 @@ class _LoginPageState extends State<LoginPage> {
           final String status = data['status'] ?? 'active';
           if (role == 'admin' && status == 'pending') {
             await _authService.signOut();
+            if (!mounted) return;
             setState(() {
               _errorMessage =
                   'Akun Admin Anda masih dalam proses verifikasi oleh Super Admin. Harap tunggu.';
@@ -76,6 +99,7 @@ class _LoginPageState extends State<LoginPage> {
             return;
           } else if (role == 'admin' && status == 'rejected') {
             await _authService.signOut();
+            if (!mounted) return;
             setState(() {
               _errorMessage =
                   'Pendaftaran Admin Anda ditolak oleh Super Admin.';
@@ -113,11 +137,141 @@ class _LoginPageState extends State<LoginPage> {
         _errorMessage = 'Terjadi kesalahan. Coba lagi nanti.';
       });
     } finally {
-      if (mounted) {
+      if (mounted && !_isRedirecting) {
         setState(() {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _handleGoogleToEmailPasswordLink(
+    String email,
+    String password,
+  ) async {
+    bool? proceed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF11182D),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: const Color(0xFF22D3EE).withValues(alpha: 0.35),
+            ),
+          ),
+          title: const Text(
+            'Hubungkan Sandi ke Google',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            'Akun $email terdaftar menggunakan Google.\n\n'
+            'Silakan masuk menggunakan Google terlebih dahulu untuk menghubungkan kata sandi ini ke akun Anda.',
+            style: const TextStyle(
+              color: Color(0xFFD5DBF2),
+              height: 1.4,
+              fontSize: 13,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: const Text(
+                'Batal',
+                style: TextStyle(color: Color(0xFF94A3B8)),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF22D3EE),
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+              child: const Text(
+                'Lanjutkan Google Sign In',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (proceed != true || !mounted) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final googleSignIn = GoogleSignIn();
+      await googleSignIn.signOut();
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      if (googleUser.email.toLowerCase() != email.toLowerCase()) {
+        setState(() {
+          _errorMessage =
+              'Email Google harus sama dengan email yang dimasukkan.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final OAuthCredential googleCredential = await _authService
+          .buildGoogleCredential(googleUser);
+      final userCred = await _authService.signInWithCredential(
+        googleCredential,
+      );
+      final user = userCred.user;
+
+      if (user != null) {
+        debugPrint(
+          "DATA PROVIDER SEBELUM LINKING: ${user.providerData.map((p) => p.providerId).toList()}",
+        );
+        await _authService.linkPasswordToCurrentUser(
+          email: email,
+          password: password,
+        );
+        debugPrint(
+          "DATA PROVIDER SETELAH LINKING: ${user.providerData.map((p) => p.providerId).toList()}",
+        );
+        debugPrint('Password provider berhasil dihubungkan ke akun Google');
+
+        final providers = user.providerData.map((p) => p.providerId).toList();
+        debugPrint(
+          "PROVIDER AKTIF (setelah linking Kasus 3): ${providers.join(', ')}",
+        );
+
+        var userData = await _firestoreService.getUserData(user.uid);
+        if (userData == null) {
+          userData = {
+            'nama': user.displayName ?? googleUser.displayName ?? '',
+            'email': email,
+            'noHp': '',
+            'foto': '',
+            'role': 'user',
+            'status': 'active',
+            'createdAt': FieldValue.serverTimestamp(),
+          };
+          await _firestoreService.createUser(user.uid, userData);
+        }
+        await _navigateToDashboard(user, userData);
+      }
+    } catch (e) {
+      debugPrint('Error linking Google to Email/Password: $e');
+      setState(() {
+        _errorMessage = 'Gagal menghubungkan kata sandi: $e';
+        _isLoading = false;
+      });
     }
   }
 
@@ -178,152 +332,9 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  /// Menampilkan dialog minta password agar Google credential bisa di-link
-  /// ke akun email+password yang sudah ada.
-  /// Mengembalikan password yang diinput, atau null jika dibatalkan.
-  Future<String?> _askPasswordForLinking(String email) async {
-    final controller = TextEditingController();
-    bool obscure = true;
-    String? result;
 
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogCtx) {
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF11182D),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: const Color(0xFF22D3EE).withValues(alpha: 0.35),
-                ),
-              ),
-              title: const Text(
-                'Hubungkan Akun Google',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Akun $email sudah terdaftar dengan Email & Password.\n\n'
-                    'Masukkan password Anda untuk menghubungkan akun Google ke akun ini.',
-                    style: const TextStyle(
-                      color: Color(0xFFD5DBF2),
-                      height: 1.4,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    obscureText: obscure,
-                    autofocus: true,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: '••••••••',
-                      hintStyle: const TextStyle(color: Color(0xFF64748B)),
-                      filled: true,
-                      fillColor: const Color(0xFF0F172A),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: const Color(0xFF22D3EE).withValues(alpha: 0.3),
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: const Color(0xFF22D3EE).withValues(alpha: 0.2),
-                        ),
-                      ),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          obscure
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          color: const Color(0xFF94A3B8),
-                        ),
-                        onPressed: () =>
-                            setDialogState(() => obscure = !obscure),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: const Text(
-                    'Batal',
-                    style: TextStyle(color: Color(0xFF94A3B8)),
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF22D3EE),
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: () {
-                    result = controller.text;
-                    Navigator.of(dialogCtx).pop();
-                  },
-                  child: const Text(
-                    'Hubungkan',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    controller.dispose();
-    return (result != null && result!.isNotEmpty) ? result : null;
-  }
 
   Future<void> _loginWithGoogle() async {
-    // ─── FLOW LOGIN GOOGLE — 1 EMAIL = 1 AKUN ──────────────────────────────
-    //
-    // Prinsip: JANGAN bergantung pada fetchSignInMethodsForEmail (deprecated,
-    // sering return [] sehingga tidak reliable sebagai guard).
-    //
-    // Algoritma yang benar:
-    //
-    //   1. Sign in Google → dapat googleUser (belum sentuh Firebase Auth)
-    //   2. Bangun googleCredential
-    //   3. Coba signInWithCredential(googleCredential)
-    //
-    //      KASUS A — berhasil, isNewUser == false:
-    //        Akun Firebase sudah ada DAN sudah punya Google provider.
-    //        → cek Firestore → masuk dashboard ✅
-    //
-    //      KASUS B — berhasil, isNewUser == true:
-    //        Firebase baru buat akun baru via Google credential.
-    //        Ini artinya email ini belum punya Google provider di Firebase Auth
-    //        sebelumnya → akun ini "mengambil alih" email dari akun email+password.
-    //        SEGERA hapus akun baru ini, minta password user, sign in
-    //        email+password, lalu link Google ke akun lama.
-    //        → setelah linking, DUA provider aktif di satu akun ✅
-    //
-    //      KASUS C — throw account-exists-with-different-credential:
-    //        Firebase "One account per email" aktif.
-    //        Sama dengan KASUS B tapi Firebase menolak duluan.
-    //        → minta password → sign in email+password → link Google ✅
-    //
-    // Dengan ini, flow benar 100% terlepas dari setting Firebase Console.
-    // ──────────────────────────────────────────────────────────────────────
-
     if (_isLoading) return;
     FocusScope.of(context).unfocus();
     setState(() {
@@ -347,7 +358,30 @@ class _LoginPageState extends State<LoginPage> {
       debugPrint('── Google Login ─────────────────────────────');
       debugPrint('  email : $googleEmail');
 
-      // ── Step 1: Coba sign in Google langsung ─────────────────────────────
+      // Cek apakah email sudah punya password provider tapi Google belum terhubung
+      List<String> methods = [];
+      try {
+        methods = await _authService.fetchSignInMethodsForEmail(googleEmail);
+      } catch (e) {
+        debugPrint('  [auth] error fetching methods: $e');
+      }
+
+      final bool hasExistingPassword = methods.contains('password');
+      final bool hasGoogle = methods.contains('google.com');
+
+      if (hasExistingPassword && !hasGoogle) {
+        debugPrint(
+          '  [auth] Akun email/password ada tapi Google belum terhubung. Melakukan linking...',
+        );
+        await _performEmailPasswordLinkFlow(
+          googleEmail,
+          googleCredential,
+          googleSignIn,
+        );
+        return;
+      }
+
+      // Langkah 1: Coba sign in Google langsung
       UserCredential googleSignInResult;
       try {
         googleSignInResult = await _authService.signInWithCredential(
@@ -356,7 +390,6 @@ class _LoginPageState extends State<LoginPage> {
       } on FirebaseAuthException catch (e) {
         if (e.code == 'account-exists-with-different-credential') {
           // KASUS C: Firebase mencegah pembuatan akun duplikat.
-          // Tangani sama seperti KASUS B di bawah.
           debugPrint('  [auth] account-exists → perlu linking');
           await _performEmailPasswordLinkFlow(
             googleEmail,
@@ -381,13 +414,14 @@ class _LoginPageState extends State<LoginPage> {
       );
       debugPrint('  uid       : ${newUser.uid}');
 
-      // ── Step 2: Deteksi apakah Firebase baru buat akun (KASUS B) ─────────
-      if (googleSignInResult.additionalUserInfo?.isNewUser == true) {
-        // Firebase membuat akun Google baru — artinya sebelumnya tidak ada
-        // akun Google untuk email ini. Kemungkinan besar ada akun email+password.
-        // HAPUS akun Google baru ini agar tidak ada duplikat.
+      // Periksa metode sign-in email ini untuk membedakan Kasus 1 vs Kasus 2
+      final bool isNewUser =
+          googleSignInResult.additionalUserInfo?.isNewUser ?? false;
+
+      // Langkah 2: Deteksi apakah Firebase baru buat akun dan password exists (KASUS B/Kasus 2)
+      if (isNewUser && hasExistingPassword) {
         debugPrint(
-          '  [auth] isNewUser=true → hapus akun Google baru, perlu linking',
+          '  [auth] isNewUser=true dan ada password account → hapus akun Google baru, perlu linking',
         );
         try {
           await newUser.delete();
@@ -405,22 +439,28 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // ── Step 3: KASUS A — akun sudah ada dengan Google provider ──────────
-      // Cek dokumen Firestore
-      final userData = await _firestoreService.getUserData(newUser.uid);
+      var userData = await _firestoreService.getUserData(newUser.uid);
       if (userData == null) {
-        debugPrint('  [firestore] dokumen uid=${newUser.uid} tidak ditemukan');
-        await newUser.delete();
+        if (isNewUser) {
+          try {
+            await newUser.delete();
+          } catch (deleteErr) {
+            debugPrint('  [auth] gagal hapus akun baru: $deleteErr');
+          }
+        }
         await _authService.signOut();
-        if (!mounted) return;
         setState(() {
           _errorMessage =
-              'Akun Google (${newUser.email}) belum terdaftar. '
-              'Silakan daftar terlebih dahulu.';
+              'Akun Gmail ini belum terdaftar. Silakan registrasi terlebih dahulu.';
           _isLoading = false;
         });
         return;
       }
+
+      final providers = newUser.providerData.map((p) => p.providerId).toList();
+      debugPrint(
+        "PROVIDER AKTIF (Google Login berhasil): ${providers.join(', ')}",
+      );
 
       debugPrint('  [firestore] OK — role: ${userData['role']}');
       await _navigateToDashboard(newUser, userData);
@@ -432,7 +472,7 @@ class _LoginPageState extends State<LoginPage> {
       debugPrint('  [Google login error] $e');
       setState(() => _errorMessage = 'Gagal login dengan Google. Coba lagi.');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && !_isRedirecting) setState(() => _isLoading = false);
     }
   }
 
@@ -446,76 +486,31 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
 
     setState(() => _isLoading = false);
-    final String? password = await _askPasswordForLinking(email);
 
-    if (password == null || !mounted) {
-      await googleSignIn.signOut();
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    // Sign in dengan email+password
-    final UserCredential emailCred;
-    try {
-      emailCred = await _authService.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-    } on FirebaseAuthException catch (authErr) {
-      await googleSignIn.signOut();
-      if (!mounted) return;
-      setState(() {
-        _errorMessage =
-            (authErr.code == 'invalid-credential' ||
-                authErr.code == 'wrong-password')
-            ? 'Password salah. Akun Google tidak bisa dihubungkan.'
-            : _mapFirebaseError(authErr.code);
-        _isLoading = false;
-      });
-      return;
-    }
-
-    // Link Google credential ke akun email+password
-    try {
-      await _authService.linkGoogleToCurrentUser(googleCredential);
-      debugPrint('  [link] ✅ Google provider berhasil ditambahkan');
-      debugPrint(
-        '  [link] providers: ${emailCred.user?.providerData.map((p) => p.providerId).toList()}',
-      );
-    } on FirebaseAuthException catch (linkErr) {
-      debugPrint('  [link] warning: ${linkErr.code}');
-      if (linkErr.code == 'credential-already-in-use') {
-        await _authService.signOut();
-        await googleSignIn.signOut();
-        if (!mounted) return;
-        setState(() {
-          _errorMessage =
-              'Akun Google ini sudah terhubung ke akun lain. '
-              'Gunakan akun Google yang berbeda.';
-          _isLoading = false;
-        });
-        return;
-      }
-      // Error lain — tetap lanjutkan, user sudah login via email+password
-    }
-
-    final User? user = emailCred.user;
-    if (user == null || !mounted) return;
-
-    final userData = await _firestoreService.getUserData(user.uid);
-    if (userData == null) {
-      await _authService.signOut();
-      if (!mounted) return;
-      setState(() {
-        _errorMessage =
-            'Akun ($email) belum terdaftar. Silakan daftar terlebih dahulu.';
-        _isLoading = false;
-      });
-      return;
-    }
-
-    await _navigateToDashboard(user, userData);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return _PasswordLinkingDialog(
+          email: email,
+          googleCredential: googleCredential,
+          googleSignIn: googleSignIn,
+          authService: _authService,
+          firestoreService: _firestoreService,
+          onSuccess: (user, userData) {
+            if (!mounted) return;
+            _navigateToDashboard(user, userData);
+          },
+          onError: (message) {
+            if (!mounted) return;
+            setState(() {
+              _errorMessage = message;
+              _isLoading = false;
+            });
+          },
+        );
+      },
+    );
   }
 
   /// Validasi status akun lalu navigasi ke dashboard sesuai role.
@@ -548,6 +543,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     if (!mounted) return;
+    _isRedirecting = true;
     final String nextRoute;
     if (role == 'superadmin' || role == 'super_admin') {
       nextRoute = '/superadmin-dashboard';
@@ -556,6 +552,8 @@ class _LoginPageState extends State<LoginPage> {
     } else {
       nextRoute = '/user-dashboard';
     }
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
     Navigator.of(context).pushReplacementNamed(nextRoute);
   }
 
@@ -751,6 +749,243 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PasswordLinkingDialog extends StatefulWidget {
+  final String email;
+  final OAuthCredential googleCredential;
+  final GoogleSignIn googleSignIn;
+  final AuthService authService;
+  final FirestoreService firestoreService;
+  final Function(User user, Map<String, dynamic> userData) onSuccess;
+  final Function(String message) onError;
+
+  const _PasswordLinkingDialog({
+    required this.email,
+    required this.googleCredential,
+    required this.googleSignIn,
+    required this.authService,
+    required this.firestoreService,
+    required this.onSuccess,
+    required this.onError,
+  });
+
+  @override
+  State<_PasswordLinkingDialog> createState() => _PasswordLinkingDialogState();
+}
+
+class _PasswordLinkingDialogState extends State<_PasswordLinkingDialog> {
+  final _controller = TextEditingController();
+  bool _obscure = true;
+  bool _isDialogLoading = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final password = _controller.text.trim();
+    if (password.isEmpty) return;
+
+    setState(() {
+      _isDialogLoading = true;
+    });
+
+    try {
+      // 1. Verifikasi password menggunakan Firebase Auth
+      await widget.authService.signInWithEmailAndPassword(
+        email: widget.email,
+        password: password,
+      );
+
+      // 2. Jika password benar, lakukan linkWithCredential
+      await widget.authService.linkGoogleToCurrentUser(widget.googleCredential);
+
+      // Reload user to sync providers
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        await currentUser.reload();
+      }
+
+      if (!mounted) return;
+      // Close the password dialog
+      Navigator.of(context).pop();
+
+      // Retrieve user data and invoke onSuccess
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        var userData = await widget.firestoreService.getUserData(user.uid);
+        if (userData == null) {
+          userData = {
+            'nama': user.displayName ?? '',
+            'email': widget.email,
+            'noHp': '',
+            'foto': '',
+            'role': 'user',
+            'status': 'active',
+            'createdAt': FieldValue.serverTimestamp(),
+          };
+          await widget.firestoreService.createUser(user.uid, userData);
+        }
+        widget.onSuccess(user, userData);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isDialogLoading = false;
+      });
+
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        // Tampilkan dialog error
+        showDialog<void>(
+          context: context,
+          builder: (errCtx) => AlertDialog(
+            backgroundColor: const Color(0xFF11182D),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.35),
+              ),
+            ),
+            title: const Text(
+              'Error',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            content: const Text(
+              'Password yang Anda masukkan salah.',
+              style: TextStyle(color: Color(0xFFD5DBF2)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(errCtx).pop(),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(color: Color(0xFF22D3EE), fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      widget.onError(e.message ?? 'Gagal menghubungkan kata sandi.');
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isDialogLoading = false;
+      });
+      widget.onError('Terjadi kesalahan: $e');
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF11182D),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: const Color(0xFF22D3EE).withValues(alpha: 0.35),
+        ),
+      ),
+      title: const Text(
+        'Hubungkan Akun Google',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Akun ini sudah terdaftar menggunakan Email & Password.\nMasukkan password untuk menghubungkan akun Google.',
+            style: const TextStyle(
+              color: Color(0xFFD5DBF2),
+              height: 1.4,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            obscureText: _obscure,
+            autofocus: true,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: '••••••••',
+              hintStyle: const TextStyle(color: Color(0xFF64748B)),
+              filled: true,
+              fillColor: const Color(0xFF0F172A),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: const Color(0xFF22D3EE).withValues(alpha: 0.3),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: const Color(0xFF22D3EE).withValues(alpha: 0.2),
+                ),
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscure
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: const Color(0xFF94A3B8),
+                ),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isDialogLoading
+              ? null
+              : () {
+                  widget.googleSignIn.signOut();
+                  Navigator.of(context).pop();
+                },
+          child: const Text(
+            'Batal',
+            style: TextStyle(color: Color(0xFF94A3B8)),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF22D3EE),
+            foregroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          onPressed: _isDialogLoading ? null : _submit,
+          child: _isDialogLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                  ),
+                )
+              : const Text(
+                  'Hubungkan',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+        ),
+      ],
     );
   }
 }

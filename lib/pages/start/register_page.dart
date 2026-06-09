@@ -359,7 +359,7 @@ class _RegisterPageState extends State<RegisterPage> {
       case 'invalid-email':
         return 'Format email tidak valid.';
       case 'email-already-in-use':
-        return 'Email sudah terdaftar. Coba login langsung atau gunakan "Lupa Password".';
+        return 'Email sudah terdaftar. Silakan gunakan email lain.';
       case 'email-google-no-password':
         // Kasus khusus: email terdaftar via Google, belum ada password provider
         return 'Email ini terdaftar via Google. Silakan login menggunakan tombol Google, '
@@ -374,7 +374,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _sectionHeader() {
-    // Header ringkas di atas form.
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -657,7 +657,6 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildPhotoList() {
-    // Daftar foto station tampil horizontal dengan tombol tambah.
     return SizedBox(
       height: 110,
       child: ListView.builder(
@@ -746,7 +745,6 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildLegalDocsList() {
-    // Daftar dokumen legalitas ditampilkan sebagai list kartu.
     return Column(
       children: [
         ...List.generate(_legalDocFiles.length, (index) {
@@ -1001,13 +999,16 @@ class _RegisterPageState extends State<RegisterPage> {
       context: context,
       initialTime: initialTime,
       builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            timePickerTheme: const TimePickerThemeData(
-              backgroundColor: Color(0xFF0F172A),
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              timePickerTheme: const TimePickerThemeData(
+                backgroundColor: Color(0xFF0F172A),
+              ),
             ),
+            child: child ?? const SizedBox.shrink(),
           ),
-          child: child ?? const SizedBox.shrink(),
         );
       },
     );
@@ -1064,7 +1065,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildPageHeader() {
-    // Header atas hanya berisi tombol kembali dan judul halaman.
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Center(
@@ -1110,7 +1111,6 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildModeSwitcher() {
-    // Switch mode user/admin tetap dipertahankan di area form utama.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1120,7 +1120,6 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildFormSwitcher() {
-    // Form user dan admin dipilih sesuai mode tanpa mengubah layout visual.
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
       child: _isAdminMode ? _adminForm() : _userForm(),
@@ -1165,7 +1164,6 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildActionsSection() {
-    // Tombol submit dan footer tetap berada di bagian bawah form.
     return Column(
       children: [
         AuthPrimaryButton(
@@ -1267,7 +1265,6 @@ class _UploadBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Kotak upload sederhana untuk memilih file baru.
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -1328,7 +1325,6 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Catatan kecil di bawah form untuk memberi konteks tambahan.
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),

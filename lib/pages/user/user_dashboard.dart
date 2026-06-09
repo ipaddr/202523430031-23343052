@@ -36,8 +36,10 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   // membuat Future baru setiap rebuild (dipicu stream Firestore) sehingga
   // FutureBuilder tidak pernah settle dan berita tidak tampil pada release build.
   late Future<List<NewsModel>> _newsFuture;
+  Stream<DocumentSnapshot>? _userStream;
 
   int _activeTabIndex = 0;
+  bool _hasInitializedTabIndex = false;
   // Flag untuk mencegah double-navigation saat proses logout sedang berjalan.
   bool _isLoggingOut = false;
 
@@ -46,8 +48,13 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     super.initState();
     // Inisialisasi sekali — Future ini tidak akan di-recreate selama widget hidup.
     _newsFuture = _newsService.getLatestGamingNews();
+    final currentUser = _authService.getCurrentUser();
+    if (currentUser != null) {
+      _userStream = _firestoreService.getUserStream(currentUser.uid);
+      _firestoreService.completeFinishedBookings(userId: currentUser.uid);
+    }
     debugPrint('================ GNEWS FUTURE INIT ================');
-    debugPrint('GNEWS_API_KEY Loaded: Yes');
+    debugPrint('GNEWS_API_KEY Dimuat: Ya');
     debugPrint(
       'Future dibuat di initState — tidak akan di-recreate saat rebuild.',
     );
@@ -57,12 +64,15 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final Object? args = ModalRoute.of(context)?.settings.arguments;
-    if (args is Map && args.containsKey('initialTabIndex')) {
-      final int? index = args['initialTabIndex'] as int?;
-      if (index != null) {
-        _activeTabIndex = index;
+    if (!_hasInitializedTabIndex) {
+      final Object? args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map && args.containsKey('initialTabIndex')) {
+        final int? index = args['initialTabIndex'] as int?;
+        if (index != null) {
+          _activeTabIndex = index;
+        }
       }
+      _hasInitializedTabIndex = true;
     }
   }
 
@@ -108,6 +118,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       );
     }
 
+    // Inisialisasi userStream jika belum dilakukan (misal currentUser baru tersedia setelah build)
+    _userStream ??= _firestoreService.getUserStream(currentUser.uid);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false,
@@ -115,7 +128,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         child: SafeArea(
           bottom: false,
           child: StreamBuilder<DocumentSnapshot>(
-            stream: _firestoreService.getUserStream(currentUser.uid),
+            stream: _userStream,
             builder: (context, userSnapshot) {
               Map<String, dynamic> userData = {};
               if (userSnapshot.hasData && userSnapshot.data!.exists) {
@@ -123,13 +136,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               }
 
               final String userName =
-                  userData['nama'] ??
-                  userData['name'] ??
-                  'Gamers';
+                  userData['nama'] ?? userData['name'] ?? 'Gamers';
               final String avatarUrl =
-                  userData['foto'] ??
-                  userData['photoUrl'] ??
-                  '';
+                  userData['foto'] ?? userData['photoUrl'] ?? '';
 
               return Center(
                 child: ConstrainedBox(
@@ -137,17 +146,15 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Sticky Header (diakses di seluruh tab)
                       _buildHeader(
                         userName: userName,
                         avatarUrl: avatarUrl,
                         currentUser: currentUser,
                       ),
 
-                      // Area Konten Dinamis
                       Expanded(
                         child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
+                          duration: Duration.zero,
                           child: _buildTabContent(
                             userName: userName,
                             avatarUrl: avatarUrl,
@@ -156,7 +163,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                         ),
                       ),
 
-                      // Bottom Navigation Bar
                       _buildUserBottomNavBar(),
                     ],
                   ),
@@ -169,7 +175,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-  // Switch Tab Content
   Widget _buildTabContent({
     required String userName,
     required String avatarUrl,
@@ -240,7 +245,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-  // Header Widget
   Widget _buildHeader({
     required String userName,
     required String avatarUrl,
@@ -255,10 +259,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           Expanded(
             child: Row(
               children: [
-                // Foto Profil User (Samakan dengan style Admin)
                 CustomUserAvatar(photoUrl: avatarUrl, size: 52),
                 const SizedBox(width: 12),
-                // Nama User
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,7 +308,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-  // Hero Banner Berita Game Widget
   Widget _buildHeroNewsBanner(NewsModel news) {
     final String title = news.title.isNotEmpty ? news.title : 'Berita Terkini';
     final String description = news.description.isNotEmpty
@@ -358,7 +360,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           borderRadius: BorderRadius.circular(24),
           child: Stack(
             children: [
-              // ── Layer 1: Gambar GNews ──────────────────────────────────────
+              // Layer 1: Gambar GNews
               // non-Positioned di Stack → Stack pakai ukuran dari SizedBox ini.
               // Kalau imageUrl null atau gambar gagal load, layer ini tidak
               // menambah visual apapun — gradient Container parent tetap terlihat
@@ -372,7 +374,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
-                      // Shimmer ringan saat loading
+
                       return const SizedBox.shrink();
                     },
                     errorBuilder: (context, error, stack) {
@@ -394,7 +396,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                         ),
                         child: Stack(
                           children: [
-                            // Lingkaran dekoratif background
                             Positioned(
                               right: -40,
                               top: -40,
@@ -421,7 +422,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                                 ),
                               ),
                             ),
-                            // Ikon sumber berita di tengah kanan
+
                             Positioned(
                               right: 20,
                               top: 0,
@@ -441,7 +442,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   ),
                 ),
 
-              // ── Layer 2: Overlay gelap (teks tetap terbaca) ───────────────
+              // Layer 2: Overlay gelap (teks tetap terbaca)
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -459,7 +460,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 ),
               ),
 
-              // ── Layer 3: Dekorasi lingkaran kiri atas ────────────────────
+              // Layer 3: Dekorasi lingkaran kiri atas
               Positioned(
                 left: -30,
                 top: -30,
@@ -473,7 +474,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                 ),
               ),
 
-              // ── Layer 4: Ikon dekoratif kanan bawah (hanya tanpa gambar) ────
+              // Layer 4: Ikon dekoratif kanan bawah (hanya tanpa gambar)
               if (imageUrl == null)
                 Positioned(
                   right: -20,
@@ -485,14 +486,13 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                   ),
                 ),
 
-              // ── Layer 5: Konten teks ──────────────────────────────────────
+              // Layer 5: Konten teks
               Positioned.fill(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Badge + Source
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -506,7 +506,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              'NEWS UPDATE',
+                              'INFO BERITA',
                               style: AppTextStyle.caption2.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -535,7 +535,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
 
                       const Spacer(),
 
-                      // Judul berita
                       Text(
                         title,
                         style: AppTextStyle.h3.copyWith(
@@ -549,7 +548,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                       ),
                       const SizedBox(height: 5),
 
-                      // Deskripsi
                       Text(
                         description,
                         style: AppTextStyle.body3.copyWith(
@@ -624,7 +622,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-  // Game Station Populer Section Widget
   Widget _buildPopulerStationSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -701,7 +698,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               final double ratingB = (b['rating'] is num)
                   ? (b['rating'] as num).toDouble()
                   : 0.0;
-              return ratingB.compareTo(ratingA); // Descending
+              return ratingB.compareTo(ratingA); // Menurun (tertinggi di atas)
             });
 
             if (stations.isEmpty) {
@@ -712,7 +709,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
               );
             }
 
-            // Tampilkan maksimal 5 Game Station terpopuler secara vertikal
             final List<Map<String, dynamic>> topStations = stations
                 .take(5)
                 .toList();
@@ -744,7 +740,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                     ? '$totalReview Review'
                     : 'Belum ada review';
 
-                // Ambil foto
                 String fotoUrl = '';
                 final fotoData = station['foto'];
                 if (fotoData is String && fotoData.trim().isNotEmpty) {
@@ -788,7 +783,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                       borderRadius: BorderRadius.circular(20),
                       child: Row(
                         children: [
-                          // Foto Station
                           SizedBox(
                             width: 104,
                             height: 104,
@@ -801,7 +795,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                                   )
                                 : _buildPlaceholderImage(),
                           ),
-                          // Detail Info
+
                           Expanded(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -830,7 +824,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      // Rating & Review Stack
+
                                       Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.end,
@@ -910,8 +904,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-
-  // Placeholder Image Widget
   Widget _buildPlaceholderImage() {
     return Container(
       decoration: const BoxDecoration(
@@ -931,7 +923,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-  // Notifikasi Booking User
   Future<void> _showUserNotifications(
     BuildContext context,
     User currentUser,
@@ -998,7 +989,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
 
                     final allNotifs = snapshot.data?.docs ?? [];
 
-                    final List<DocumentSnapshot> filteredNotifs = allNotifs.toList();
+                    final List<DocumentSnapshot> filteredNotifs = allNotifs
+                        .toList();
 
                     filteredNotifs.sort((a, b) {
                       final aData = a.data() as Map<String, dynamic>;
@@ -1026,17 +1018,22 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                         final data =
                             filteredNotifs[index].data()
                                 as Map<String, dynamic>;
-                        final String title = data['title']?.toString() ?? 'Notifikasi';
-                        final String message = data['message']?.toString() ?? '';
+                        final String title =
+                            data['title']?.toString() ?? 'Notifikasi';
+                        final String message =
+                            data['message']?.toString() ?? '';
                         final String type = (data['type'] ?? '').toString();
 
                         Color statusColor = Colors.white;
                         IconData statusIcon = Icons.notifications_none_rounded;
 
-                        if (type.contains('confirmed') || type.contains('success')) {
+                        if (type.contains('confirmed') ||
+                            type.contains('success')) {
                           statusColor = const Color(0xFF22D3EE);
                           statusIcon = Icons.check_circle_rounded;
-                        } else if (type.contains('cancelled') || type.contains('rejected') || type.contains('expired')) {
+                        } else if (type.contains('cancelled') ||
+                            type.contains('rejected') ||
+                            type.contains('expired')) {
                           statusColor = const Color(0xFFEF4444);
                           statusIcon = Icons.cancel_rounded;
                         } else if (type.contains('checkin')) {
@@ -1119,7 +1116,6 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     );
   }
 
-  // Navigasi Bawah Kustom (User Bottom Navigation Bar)
   Widget _buildUserBottomNavBar() {
     final double systemBottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -1223,8 +1219,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   }
 }
 
-// ─── Tombol Notifikasi User ──────────────────────────────────────────────────
-// Mengikuti pola yang sama dengan _NotificationButton di admin_header.dart:
+// Tombol Notifikasi User
+
 // • Stream getUserStream → ambil lastOpenedNotifications
 // • Stream getUserBookingNotificationsStream → hitung notif belum dibaca
 // • Tampilkan dot indicator jika ada; simpan timestamp saat dibuka
@@ -1299,7 +1295,6 @@ class _UserNotificationButtonState extends State<_UserNotificationButton> {
             return CustomNotificationButton(
               hasNotification: showDot,
               onTap: () {
-                // Simpan timestamp buka ke Firestore dan state lokal
                 final now = DateTime.now();
                 setState(() => _localLastOpened = now);
                 firestoreService.updateUser(widget.currentUser!.uid, {

@@ -22,7 +22,6 @@ class SuperAdminActivityItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Satu baris aktivitas yang menampilkan ikon, judul, waktu, dan kategori.
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),

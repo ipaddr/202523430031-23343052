@@ -20,7 +20,7 @@ class NewsService {
       return _cachedNews!;
     }
 
-    // ── Audit: Verifikasi API Key ─────────────────────────────────────────────
+    // Audit: Verifikasi API Key
     final String apiKey = dotenv.env['GNEWS_API_KEY'] ?? '';
     final bool keyLoaded = apiKey.isNotEmpty;
     debugPrint('================ GNEWS API KEY CHECK ================');
@@ -45,7 +45,7 @@ class NewsService {
       },
     );
 
-    // ── Audit: Log Request ────────────────────────────────────────────────────
+    // Audit: Log Request
     // Tampilkan URL tanpa API key agar aman di log
     final String safeUrl = uri.toString().replaceAll(apiKey, '***HIDDEN***');
     debugPrint('================ GNEWS REQUEST ================');
@@ -60,53 +60,53 @@ class NewsService {
           .get(uri)
           .timeout(const Duration(seconds: 15));
 
-      // ── Audit: Log Response ───────────────────────────────────────────────
+      // Audit: Log Response
       debugPrint('================ GNEWS RESPONSE ================');
       debugPrint('Status Code: ${response.statusCode}');
 
       switch (response.statusCode) {
         case 200:
-          debugPrint('Response Received: Yes');
+          debugPrint('Respons Diterima: Ya');
           break;
         case 401:
           debugPrint(
-            'Response Received: Yes — 401 Unauthorized (API key tidak valid)',
+            'Respons Diterima: Ya — 401 Unauthorized (API key tidak valid)',
           );
           debugPrint('Body: ${response.body}');
           debugPrint('=================================================');
           return [];
         case 403:
-          debugPrint('Response Received: Yes — 403 Forbidden (akses ditolak)');
+          debugPrint('Respons Diterima: Ya — 403 Forbidden (akses ditolak)');
           debugPrint('Body: ${response.body}');
           debugPrint('=================================================');
           return [];
         case 429:
           debugPrint(
-            'Response Received: Yes — 429 Too Many Requests (kuota habis)',
+            'Respons Diterima: Ya — 429 Too Many Requests (kuota habis)',
           );
           debugPrint('Body: ${response.body}');
           debugPrint('=================================================');
           return [];
         case 500:
-          debugPrint('Response Received: Yes — 500 Internal Server Error');
+          debugPrint('Respons Diterima: Ya — 500 Internal Server Error');
           debugPrint('Body: ${response.body}');
           debugPrint('=================================================');
           return [];
         default:
           debugPrint(
-            'Response Received: Yes — HTTP ${response.statusCode} (tidak dikenal)',
+            'Respons Diterima: Ya — HTTP ${response.statusCode} (tidak dikenal)',
           );
           debugPrint('Body: ${response.body}');
           debugPrint('=================================================');
           return [];
       }
 
-      // ── Audit: Parsing ────────────────────────────────────────────────────
+      // Audit: Parsing
       Map<String, dynamic> data;
       try {
         data = jsonDecode(response.body) as Map<String, dynamic>;
       } catch (parseError) {
-        debugPrint('Parsing Success: No');
+        debugPrint('Parsing Berhasil: Tidak');
         debugPrint('JSON decode error: $parseError');
         debugPrint(
           'Raw body (200 karakter pertama): ${response.body.substring(0, response.body.length.clamp(0, 200))}',
@@ -119,7 +119,7 @@ class NewsService {
 
       if (articles == null) {
         debugPrint(
-          'Parsing Success: No — field "articles" null atau tidak ada',
+          'Parsing Berhasil: Tidak — field "articles" null atau tidak ada',
         );
         debugPrint('Keys tersedia di response: ${data.keys.toList()}');
         debugPrint('=================================================');
@@ -128,7 +128,7 @@ class NewsService {
 
       debugPrint('=================================================');
 
-      // ── Parsing tiap artikel ──────────────────────────────────────────────
+      // Parsing tiap artikel
       final List<NewsModel> allNews = [];
       for (int i = 0; i < articles.length; i++) {
         try {
@@ -141,10 +141,10 @@ class NewsService {
         }
       }
 
-      debugPrint('Parsing Success: Yes');
-      debugPrint('GNews Raw Received: ${allNews.length} articles.');
+      debugPrint('Parsing Berhasil: Ya');
+      debugPrint('GNews Artikel Diterima: ${allNews.length} artikel.');
 
-      // ── Post-filtering: hanya berita gaming murni ─────────────────────────
+      // Post-filtering: hanya berita gaming murni
       final List<String> includeKeywords = [
         'game',
         'gaming',
@@ -235,7 +235,7 @@ class NewsService {
       );
       debugPrint('Final Gaming News Count  : ${finalNewsList.length}');
       debugPrint(
-        'Cache Updated            : ${finalNewsList.isNotEmpty ? "Yes" : "No (list kosong, tidak di-cache)"}',
+        'Cache Diperbarui         : ${finalNewsList.isNotEmpty ? "Ya" : "Tidak (list kosong, tidak di-cache)"}',
       );
       debugPrint('======================================================');
 
@@ -243,8 +243,8 @@ class NewsService {
     } on TimeoutException catch (e) {
       debugPrint('================ GNEWS TIMEOUT ================');
       debugPrint('Request timed out (>15 detik): $e');
-      debugPrint('Response Received: No');
-      debugPrint('Parsing Success: No');
+      debugPrint('Respons Diterima: Tidak');
+      debugPrint('Parsing Berhasil: Tidak');
       debugPrint('================================================');
       return [];
     } catch (e, stackTrace) {
@@ -252,8 +252,8 @@ class NewsService {
       debugPrint('================ GNEWS EXCEPTION ================');
       debugPrint('Exception: $e');
       debugPrint('StackTrace: $stackTrace');
-      debugPrint('Response Received: No');
-      debugPrint('Parsing Success: No');
+      debugPrint('Respons Diterima: Tidak');
+      debugPrint('Parsing Berhasil: Tidak');
       debugPrint('==================================================');
       return [];
     }

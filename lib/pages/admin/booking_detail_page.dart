@@ -19,7 +19,8 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
 
   bool _isRouteInitialized = false;
   String _bookingId = '';
-  String _viewMode = 'admin'; // 'admin' | 'user' | 'superadmin'
+  String _viewMode =
+      'admin'; // 'admin' | 'user' | 'superadmin' — mode tampilan halaman
   Map<String, dynamic>? _initialBookingData;
 
   @override
@@ -54,7 +55,19 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
   Color _getStatusColor(String status) => bookingStatusColor(status);
   String _getStatusLabel(String status) => bookingStatusLabel(status);
 
-  // ── Terima booking: pending → confirmed ──────────────────────────────────
+  int _timeToMinutes(String timeStr) {
+    try {
+      final String cleanStr = timeStr.replaceAll('.', ':');
+      final parts = cleanStr.split(':');
+      final int hour = int.parse(parts[0]);
+      final int minute = int.parse(parts[1]);
+      return hour * 60 + minute;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  // Terima booking: pending_confirmation+paid → confirmed
   Future<void> _handleTerimaBooking() async {
     // Guard: hanya admin yang boleh
     if (_viewMode != 'admin') {
@@ -62,35 +75,226 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
       return;
     }
 
-    Map<String, dynamic>? bookingData = _initialBookingData;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     try {
-      final snap = await FirebaseFirestore.instance
+      // 1. Ambil data booking terbaru dari Firestore
+      final bookingSnap = await FirebaseFirestore.instance
           .collection('bookings')
           .doc(_bookingId)
           .get();
-      if (snap.exists) bookingData = snap.data();
-    } catch (_) {}
 
-    if (bookingData == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+
+      if (!bookingSnap.exists) {
+        scaffoldMessenger.showSnackBar(
           const SnackBar(
             content: Text('Data booking tidak ditemukan.'),
             backgroundColor: AppColors.errorRed,
           ),
         );
+        return;
       }
-      return;
-    }
 
-    final String unitId = bookingData['unitId']?.toString() ?? '';
-    final String tanggalBooking =
-        bookingData['tanggalBooking']?.toString() ?? '';
-    final String jamMulai = bookingData['jamMulai']?.toString() ?? '';
-    final String jamSelesai = bookingData['jamSelesai']?.toString() ?? '';
+      final Map<String, dynamic> bookingData =
+          bookingSnap.data() as Map<String, dynamic>;
+      final String statusBooking = (bookingData['statusBooking'] ?? '')
+          .toString()
+          .trim();
+      final String statusPembayaran = (bookingData['statusPembayaran'] ?? '')
+          .toString()
+          .trim();
 
-    try {
-      // Batalkan booking pending lain yang bertabrakan jadwal
+      // VALIDASI 5: Status Booking
+      if (statusBooking != 'pending_confirmation') {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Hanya booking dengan status pending confirmation yang dapat diterima.',
+            ),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+        return;
+      }
+
+      // VALIDASI 6: Status Pembayaran
+      if (statusPembayaran != 'paid') {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Hanya booking dengan status pembayaran PAID yang dapat diterima.',
+            ),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+        return;
+      }
+
+      final String unitId = bookingData['unitId']?.toString() ?? '';
+      final String stationId = bookingData['stationId']?.toString() ?? '';
+      final String tanggalBooking =
+          bookingData['tanggalBooking']?.toString() ?? '';
+      final String jamMulai = bookingData['jamMulai']?.toString() ?? '';
+      final String jamSelesai = bookingData['jamSelesai']?.toString() ?? '';
+
+      // VALIDASI 1: Status Unit
+      if (unitId.isNotEmpty) {
+        final unitSnap = await FirebaseFirestore.instance
+            .collection('units')
+            .doc(unitId)
+            .get();
+        if (!mounted) return;
+        if (unitSnap.exists) {
+          final Map<String, dynamic> unitData =
+              unitSnap.data() as Map<String, dynamic>;
+          final String unitStatus = (unitData['status'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
+          if (unitStatus != 'tersedia') {
+            scaffoldMessenger.showSnackBar(
+              const SnackBar(
+                content: Text('Unit tidak tersedia untuk dikonfirmasi.'),
+                backgroundColor: AppColors.errorRed,
+              ),
+            );
+            return;
+          }
+        }
+      }
+
+      // VALIDASI 2: Konflik Jadwal dengan Booking Aktif Lain
+      if (unitId.isNotEmpty && tanggalBooking.isNotEmpty) {
+        final bookingsSnap = await FirebaseFirestore.instance
+            .collection('bookings')
+            .where('unitId', isEqualTo: unitId)
+            .where('tanggalBooking', isEqualTo: tanggalBooking)
+            .get();
+
+        if (!mounted) return;
+
+        final int newStart = _timeToMinutes(jamMulai);
+        final int newEnd = _timeToMinutes(jamSelesai);
+
+        for (final doc in bookingsSnap.docs) {
+          if (doc.id == _bookingId) continue;
+          final data = doc.data();
+          final String activeStatus = (data['statusBooking'] ?? '')
+              .toString()
+              .toLowerCase();
+
+          // pending, pending_confirmation, confirmed, active, checkin dianggap memblokir slot
+          if (activeStatus == 'pending' ||
+              activeStatus == 'pending_confirmation' ||
+              activeStatus == 'confirmed' ||
+              activeStatus == 'active' ||
+              activeStatus == 'checkin') {
+            final int existStart = _timeToMinutes(
+              data['jamMulai']?.toString() ?? '00:00',
+            );
+            final int existEnd = _timeToMinutes(
+              data['jamSelesai']?.toString() ?? '00:00',
+            );
+
+            // Terjadi overlap jika newStart < existEnd && newEnd > existStart
+            if (newStart < existEnd && newEnd > existStart) {
+              scaffoldMessenger.showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Jadwal tersebut bentrok dengan booking aktif lain.',
+                  ),
+                  backgroundColor: AppColors.errorRed,
+                ),
+              );
+              return;
+            }
+          }
+        }
+      }
+
+      // VALIDASI 3 & 4: Jam & Hari Operasional Stasiun
+      if (stationId.isNotEmpty) {
+        final stationSnap = await FirebaseFirestore.instance
+            .collection('stations')
+            .doc(stationId)
+            .get();
+        if (!mounted) return;
+        if (stationSnap.exists) {
+          final Map<String, dynamic> stationData =
+              stationSnap.data() as Map<String, dynamic>;
+          final List<dynamic> scheduleList =
+              stationData['jamOperasional'] ?? [];
+
+          // Cari hari operasional
+          final List<String> daysEngToInd = [
+            'Senin',
+            'Selasa',
+            'Rabu',
+            'Kamis',
+            'Jumat',
+            'Sabtu',
+            'Minggu',
+          ];
+          DateTime? parsedDate;
+          try {
+            parsedDate = DateTime.parse(tanggalBooking);
+          } catch (_) {}
+
+          if (parsedDate != null) {
+            final String dayName = daysEngToInd[parsedDate.weekday - 1];
+            Map<String, dynamic>? schedule;
+            for (final day in scheduleList) {
+              if (day is Map &&
+                  day['hari']?.toString().toLowerCase() ==
+                      dayName.toLowerCase()) {
+                schedule = Map<String, dynamic>.from(day);
+                break;
+              }
+            }
+
+            if (schedule != null) {
+              final bool isOpen = schedule['isOpen'] as bool? ?? true;
+              // VALIDASI 4: Hari Operasional
+              if (!isOpen) {
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Station tutup pada hari operasional tersebut.',
+                    ),
+                    backgroundColor: AppColors.errorRed,
+                  ),
+                );
+                return;
+              }
+
+              // VALIDASI 3: Jam Operasional
+              final String bukaStr = (schedule['buka'] ?? '00.00').toString();
+              final String tutupStr = (schedule['tutup'] ?? '00.00').toString();
+
+              final int openMin = _timeToMinutes(bukaStr);
+              final int closeMin = _timeToMinutes(tutupStr);
+              final int userStart = _timeToMinutes(jamMulai);
+              final int userEnd = _timeToMinutes(jamSelesai);
+
+              if (userStart < openMin || userEnd > closeMin) {
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Booking berada di luar jam operasional station.',
+                    ),
+                    backgroundColor: AppColors.errorRed,
+                  ),
+                );
+                return;
+              }
+            }
+          }
+        }
+      }
+
+      // Jika lolos semua validasi:
+      // Batalkan booking pending (unpaid) lain yang bertabrakan jadwal
       await _firestoreService.cancelConflictingBookings(
         confirmedBookingId: _bookingId,
         unitId: unitId,
@@ -98,31 +302,32 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
         jamMulai: jamMulai,
         jamSelesai: jamSelesai,
       );
-      // Set confirmed
+
+      if (!mounted) return;
+
+      // Konfirmasi booking
       await _firestoreService.updateBooking(_bookingId, {
         'statusBooking': 'confirmed',
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Booking diterima dan dikonfirmasi.'),
-            backgroundColor: AppColors.successGreen,
-          ),
-        );
-      }
+
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text('Booking diterima dan dikonfirmasi.'),
+          backgroundColor: AppColors.successGreen,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal menerima booking: $e'),
-            backgroundColor: AppColors.errorRed,
-          ),
-        );
-      }
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Gagal menerima booking: $e'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
     }
   }
 
-  // ── Tolak booking: pending → rejected ────────────────────────────────────
+  // Tolak booking: pending → rejected
   Future<void> _handleTolakBooking() async {
     if (_viewMode != 'admin') {
       debugPrint('BookingDetail: aksi TOLAK diblokir — viewMode=$_viewMode');
@@ -153,7 +358,7 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
     }
   }
 
-  // ── Check-in: pending_confirmation+paid → confirmed ──────────────────────
+  // Konfirmasi Check-in: pending_confirmation+paid → confirmed
   Future<void> _handleCheckIn() async {
     if (_viewMode != 'admin') {
       debugPrint('BookingDetail: aksi CHECK-IN diblokir — viewMode=$_viewMode');
@@ -203,7 +408,9 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Check-in berhasil dikonfirmasi. Status Booking menjadi dikonfirmasi.'),
+            content: Text(
+              'Check-in berhasil dikonfirmasi. Status Booking menjadi dikonfirmasi.',
+            ),
             backgroundColor: AppColors.successGreen,
           ),
         );
@@ -220,7 +427,7 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
     }
   }
 
-  // ── Batalkan booking: pending → cancelled ────────────────────────────────
+  // Batalkan booking: pending → cancelled
   Future<void> _handleCancelBooking() async {
     if (_viewMode != 'user') {
       debugPrint('BookingDetail: aksi CANCEL diblokir — viewMode=$_viewMode');
@@ -248,7 +455,7 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
     }
   }
 
-  // ── Selesaikan booking: active → completed ───────────────────────────────
+  // Selesaikan booking: active → completed
   Future<void> _handleCompleteBooking() async {
     if (_viewMode != 'admin') {
       debugPrint('BookingDetail: aksi COMPLETE diblokir — viewMode=$_viewMode');
@@ -314,7 +521,7 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
                 );
               }
 
-              // ── Ambil ID referensi untuk fetch data terkait ──────────────
+              // Ambil ID referensi untuk fetch data terkait
               final String bookingId =
                   bookingData['bookingId']?.toString() ?? _bookingId;
               final String statusBooking =
@@ -324,7 +531,7 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
                   bookingData['stationId']?.toString() ?? '';
               final String unitId = bookingData['unitId']?.toString() ?? '';
 
-              // ── Data jadwal & harga langsung dari dokumen booking ─────────
+              // Data jadwal & harga langsung dari dokumen booking
               final String tanggalBooking =
                   bookingData['tanggalBooking']?.toString() ?? '-';
               final String jamMulai =
@@ -369,7 +576,7 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
   }
 }
 
-// ─── Widget konten utama — fetch user/station/unit secara paralel ────────────
+// Widget konten utama — fetch user/station/unit secara paralel
 // Dipisah agar StreamBuilder booking di atas tidak ikut rebuild saat
 // data user/station/unit datang.
 class _BookingDetailContent extends StatelessWidget {
@@ -377,7 +584,8 @@ class _BookingDetailContent extends StatelessWidget {
   final String bookingId;
   final String statusBooking;
   final String statusPembayaran;
-  final String viewMode; // 'admin' | 'user' | 'superadmin'
+  final String
+  viewMode; // 'admin' | 'user' | 'superadmin' — mode tampilan halaman
   final String userId;
   final String stationId;
   final String unitId;
@@ -419,7 +627,7 @@ class _BookingDetailContent extends StatelessWidget {
     required this.onComplete,
   });
 
-  /// Fetch user, station, dan unit secara paralel — masing-masing terisolasi.
+  /// Ambil data user, station, dan unit secara paralel — masing-masing terisolasi.
   /// Jika satu query gagal (permission-denied, dll), yang lain tetap jalan.
   Future<List<Map<String, dynamic>?>> _fetchRelatedData() async {
     debugPrint('── BookingDetail fetch ──────────────────────');
@@ -499,7 +707,7 @@ class _BookingDetailContent extends StatelessWidget {
         final Map<String, dynamic> stationData = snap.data?[1] ?? {};
         final Map<String, dynamic> unitData = snap.data?[2] ?? {};
 
-        // ── User ────────────────────────────────────────────────────────────
+        // User
         final String namaUser = userData['nama']?.toString().isNotEmpty == true
             ? userData['nama'].toString()
             : '-';
@@ -512,13 +720,13 @@ class _BookingDetailContent extends StatelessWidget {
             : '-';
         final String fotoUser = userData['foto']?.toString() ?? '';
 
-        // ── Station ─────────────────────────────────────────────────────────
+        // Station
         final String namaStation =
             stationData['namaStation']?.toString().isNotEmpty == true
             ? stationData['namaStation'].toString()
             : '-';
 
-        // ── Unit ────────────────────────────────────────────────────────────
+        // Unit
         final String namaUnit =
             unitData['namaUnit']?.toString().isNotEmpty == true
             ? unitData['namaUnit'].toString()
@@ -531,63 +739,40 @@ class _BookingDetailContent extends StatelessWidget {
 
         return Column(
           children: [
-            // HEADER
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF141B31),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF23304C)),
-                          ),
-                          child: const Icon(
-                            Icons.chevron_left_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141B31),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF23304C)),
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Detail Booking',
-                        style: AppTextStyle.h4.copyWith(
-                          color: AppColors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.secondaryDark.withValues(alpha: 0.9),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.accentCyan.withValues(alpha: 0.15),
-                        width: 1,
+                      child: const Icon(
+                        Icons.chevron_left_rounded,
+                        color: Colors.white,
+                        size: 20,
                       ),
                     ),
-                    child: const Icon(
-                      Icons.notifications_none_rounded,
-                      color: AppColors.softGray,
-                      size: 22,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Detail Booking',
+                    style: AppTextStyle.h4.copyWith(
+                      color: AppColors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
             ),
 
-            // CONTENT
+            // KONTEN UTAMA
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(
@@ -626,7 +811,7 @@ class _BookingDetailContent extends StatelessWidget {
     );
   }
 
-  // ── Booking card: Booking ID + status badge ──────────────────────────────
+  // Kartu booking: ID Booking + badge status
   Widget _buildBookingCard(String bookingId, String statusBooking) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -678,7 +863,7 @@ class _BookingDetailContent extends StatelessWidget {
     );
   }
 
-  // ── Customer card: data dari users/{userId} ──────────────────────────────
+  // Kartu pelanggan: data dari users/{userId}
   Widget _buildCustomerCard(
     String namaUser,
     String fotoUser,
@@ -689,7 +874,7 @@ class _BookingDetailContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'CUSTOMER INFORMATION',
+          'INFORMASI PELANGGAN',
           style: AppTextStyle.caption2.copyWith(
             color: AppColors.softGray,
             fontWeight: FontWeight.bold,
@@ -716,7 +901,7 @@ class _BookingDetailContent extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Customer Name',
+                      'Nama Pelanggan',
                       style: AppTextStyle.caption2.copyWith(
                         color: AppColors.softGray,
                       ),
@@ -752,13 +937,13 @@ class _BookingDetailContent extends StatelessWidget {
     );
   }
 
-  // ── Unit card: data dari units/{unitId} + stations/{stationId} ──────────
+  // Kartu unit: data dari units/{unitId} + stations/{stationId}
   Widget _buildUnitCard(String namaUnit, String jenisRoom, String namaStation) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'UNIT INFORMATION',
+          'INFORMASI UNIT',
           style: AppTextStyle.caption2.copyWith(
             color: AppColors.softGray,
             fontWeight: FontWeight.bold,
@@ -797,7 +982,7 @@ class _BookingDetailContent extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Room / Unit',
+                      'Ruangan / Unit',
                       style: AppTextStyle.caption2.copyWith(
                         color: AppColors.softGray,
                       ),
@@ -827,7 +1012,7 @@ class _BookingDetailContent extends StatelessWidget {
     );
   }
 
-  // ── Schedule card ─────────────────────────────────────────────────────────
+  // Kartu jadwal
   Widget _buildScheduleCard(
     String tanggalBooking,
     String jamMulai,
@@ -838,7 +1023,7 @@ class _BookingDetailContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'DATE & SCHEDULE',
+          'TANGGAL & JADWAL',
           style: AppTextStyle.caption2.copyWith(
             color: AppColors.softGray,
             fontWeight: FontWeight.bold,
@@ -870,7 +1055,7 @@ class _BookingDetailContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Date',
+                        'Tanggal',
                         style: AppTextStyle.caption2.copyWith(
                           color: AppColors.softGray,
                         ),
@@ -903,7 +1088,7 @@ class _BookingDetailContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Schedule',
+                        'Jadwal',
                         style: AppTextStyle.caption2.copyWith(
                           color: AppColors.softGray,
                         ),
@@ -927,7 +1112,7 @@ class _BookingDetailContent extends StatelessWidget {
     );
   }
 
-  // ── Payment summary: hargaPerJam dari unit, totalHarga dari booking ──────
+  // Ringkasan pembayaran: hargaPerJam dari unit, totalHarga dari booking
   Widget _buildPaymentSummaryCard(
     String namaUnit,
     int durasiJam,
@@ -942,7 +1127,7 @@ class _BookingDetailContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'PAYMENT SUMMARY',
+          'RINGKASAN PEMBAYARAN',
           style: AppTextStyle.caption2.copyWith(
             color: AppColors.softGray,
             fontWeight: FontWeight.bold,
@@ -992,7 +1177,7 @@ class _BookingDetailContent extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Total Revenue',
+                    'Total Pendapatan',
                     style: AppTextStyle.body1.copyWith(
                       color: AppColors.white,
                       fontWeight: FontWeight.bold,
@@ -1014,9 +1199,9 @@ class _BookingDetailContent extends StatelessWidget {
     );
   }
 
-  // ── Action buttons — ditentukan oleh viewMode + status matrix ────────────
+  // Tombol aksi — ditentukan berdasarkan mode tampilan dan status pemesanan
   //
-  // STATUS MATRIX
+  // MATRIKS STATUS
   //   pending + unpaid   → USER: Bayar Sekarang + Batalkan
   //   pending + paid     → ADMIN: Terima + Tolak
   //   confirmed + unpaid → ADMIN: info "Menunggu Pembayaran"
@@ -1034,12 +1219,12 @@ class _BookingDetailContent extends StatelessWidget {
     final bool isPaid = statusPembayaran.toLowerCase() == 'paid';
     final bool isUnpaid = statusPembayaran.toLowerCase() == 'unpaid';
 
-    // ── SUPERADMIN: hanya lihat, tanpa aksi ──────────────────────────────
+    // SUPERADMIN: hanya lihat, tanpa aksi
     if (viewMode == 'superadmin') {
       return const SizedBox.shrink();
     }
 
-    // ── USER view ─────────────────────────────────────────────────────────
+    // USER view
     if (viewMode == 'user') {
       // pending + unpaid → Bayar + Batalkan
       if (status == 'pending' && isUnpaid) {
@@ -1119,11 +1304,19 @@ class _BookingDetailContent extends StatelessWidget {
       }
 
       // pending + paid / confirmed → info status, tidak ada aksi user
-      if ((status == 'pending' && isPaid) || status == 'confirmed') {
+      if (status == 'pending' && isPaid) {
         return _buildInfoBanner(
           icon: Icons.access_time_rounded,
           color: const Color(0xFFF59E0B),
           message: 'Booking sedang diproses oleh Admin.',
+        );
+      }
+
+      if (status == 'confirmed') {
+        return _buildInfoBanner(
+          icon: Icons.check_circle_outline_rounded,
+          color: AppColors.successGreen,
+          message: 'Booking telah dikonfirmasi.',
         );
       }
 
@@ -1140,7 +1333,7 @@ class _BookingDetailContent extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    // ── ADMIN view ────────────────────────────────────────────────────────
+    // ADMIN view
 
     // 1. Menunggu Konfirmasi & Sudah Bayar: pending_confirmation + paid → Konfirmasi Check-In & Tolak Booking
     if (status == 'pending_confirmation' && isPaid) {
@@ -1201,8 +1394,8 @@ class _BookingDetailContent extends StatelessWidget {
       );
     }
 
-    // 2. Diterima/Dikonfirmasi: confirmed → Selesaikan Booking (Selesai)
-    if (status == 'confirmed') {
+    // 2. Diterima/Dikonfirmasi/Aktif: confirmed / active / checkin → Selesaikan Booking (Tandai Selesai)
+    if (status == 'confirmed' || status == 'active' || status == 'checkin') {
       return Container(
         height: 52,
         decoration: BoxDecoration(
@@ -1223,7 +1416,7 @@ class _BookingDetailContent extends StatelessWidget {
             ),
           ),
           child: const Text(
-            'SELESAI',
+            'Tandai Selesai',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -1234,7 +1427,7 @@ class _BookingDetailContent extends StatelessWidget {
       );
     }
 
-    // 5. Terminal states
+    // 5. Status terminal — tidak ada aksi tersedia
     return const SizedBox.shrink();
   }
 

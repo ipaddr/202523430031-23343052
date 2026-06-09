@@ -81,7 +81,6 @@ class AdminBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final double systemBottomInset = MediaQuery.of(context).padding.bottom;
 
-    // Area background navbar.
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -94,13 +93,11 @@ class AdminBottomNavBar extends StatelessWidget {
         ),
       ),
       child: Padding(
-        // Menyesuaikan tinggi dengan system navigation inset.
         padding: EdgeInsets.only(bottom: systemBottomInset),
         child: SafeArea(
           top: false,
           bottom: false,
           child: Center(
-            // Konten utama navbar.
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
               child: SizedBox(

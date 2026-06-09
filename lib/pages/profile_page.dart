@@ -32,6 +32,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final AuthService _authService = AuthService();
   final FirestoreService _firestoreService = FirestoreService();
+  Stream<DocumentSnapshot>? _userStream;
 
   Future<void> _logout(NavigatorState navigator) async {
     // Sign out terlebih dahulu.
@@ -108,7 +109,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // Dialog tentang aplikasi
+
   void _showAboutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -226,8 +227,10 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
+    _userStream ??= _firestoreService.getUserStream(firebaseUser.uid);
+
     return StreamBuilder<DocumentSnapshot>(
-      stream: _firestoreService.getUserStream(firebaseUser.uid),
+      stream: _userStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -471,7 +474,6 @@ class _ProfilePageState extends State<ProfilePage> {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           children: [
             const SizedBox(height: 10),
-            // Kartu profil utama menampilkan avatar dan identitas aktif.
             Center(
               child: Stack(
                 children: [
@@ -558,7 +560,6 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             const SizedBox(height: 30),
 
-            // Aksi profil tetap memakai rute yang sama untuk semua role.
             ElevatedButton.icon(
               onPressed: () async {
                 final result = await Navigator.pushNamed(
@@ -592,7 +593,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             const SizedBox(height: 12),
 
-            // Tentang Aplikasi
+
             ElevatedButton.icon(
               onPressed: () => _showAboutDialog(context),
               style: ElevatedButton.styleFrom(
@@ -619,7 +620,6 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             const SizedBox(height: 12),
 
-            // Tombol keluar juga tetap sama untuk semua role.
             ElevatedButton.icon(
               onPressed: () => _showLogoutConfirmationDialog(context),
               style: ElevatedButton.styleFrom(

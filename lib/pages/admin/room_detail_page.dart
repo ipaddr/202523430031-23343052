@@ -138,6 +138,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     if (lower == 'digunakan') return AppColors.errorRed;
     if (lower == 'tersedia') return AppColors.successGreen;
     if (lower == 'perawatan') return AppColors.warningOrange;
+    if (lower == 'tidak_aktif' || lower == 'tidak_tersedia' || lower == 'inactive') return AppColors.softGray;
     return AppColors.softGray;
   }
 
@@ -146,6 +147,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     if (lower == 'digunakan') return 'Digunakan';
     if (lower == 'tersedia') return 'Tersedia';
     if (lower == 'perawatan') return 'Perawatan';
+    if (lower == 'tidak_aktif' || lower == 'tidak_tersedia' || lower == 'inactive') return 'Tidak Tersedia';
     return status.isEmpty ? 'Unknown' : status;
   }
 
@@ -446,6 +448,294 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     }
   }
 
+  Widget _buildInteractiveStatusCard(String currentStatus) {
+    final Color statusColorVal = _statusColor(currentStatus);
+    final String labelVal = _statusLabel(currentStatus);
+
+    return _buildSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            'Status Unit',
+            subtitle: 'Ubah ketersediaan unit ini secara instan.',
+          ),
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: () => _showStatusSelectorBottomSheet(context, currentStatus),
+            borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.paddingL,
+                vertical: AppTheme.paddingL,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                border: Border.all(
+                  color: statusColorVal.withValues(alpha: 0.2),
+                  width: 1.2,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: statusColorVal.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.verified_rounded,
+                      color: statusColorVal,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'STATUS SEKARANG',
+                          style: AppTextStyle.caption2.copyWith(
+                            color: AppColors.softGray.withValues(alpha: 0.8),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          labelVal,
+                          style: AppTextStyle.body1.copyWith(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.arrow_drop_down_rounded,
+                    color: AppColors.softGray,
+                    size: 28,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showStatusSelectorBottomSheet(BuildContext context, String currentStatus) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext sheetCtx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          decoration: const BoxDecoration(
+            color: Color(0xFF0F172A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border(
+              top: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Ubah Status Unit',
+                    style: AppTextStyle.h4.copyWith(
+                      color: AppColors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.softGray,
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.pop(sheetCtx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildStatusOptionItem(sheetCtx, 'tersedia', 'Tersedia', currentStatus),
+              const SizedBox(height: 10),
+              _buildStatusOptionItem(sheetCtx, 'digunakan', 'Digunakan', currentStatus),
+              const SizedBox(height: 10),
+              _buildStatusOptionItem(sheetCtx, 'perawatan', 'Perawatan', currentStatus),
+              const SizedBox(height: 10),
+              _buildStatusOptionItem(sheetCtx, 'tidak_aktif', 'Tidak Tersedia', currentStatus),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusOptionItem(
+    BuildContext sheetCtx,
+    String statusValue,
+    String statusLabelStr,
+    String currentStatus,
+  ) {
+    final bool isSelected = currentStatus == statusValue;
+    final Color colorVal = _statusColor(statusValue);
+
+    return InkWell(
+      onTap: () {
+        Navigator.pop(sheetCtx);
+        if (!isSelected) {
+          _confirmChangeStatus(statusValue, statusLabelStr);
+        }
+      },
+      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorVal.withValues(alpha: 0.08)
+              : AppColors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+          border: Border.all(
+            color: isSelected
+                ? colorVal.withValues(alpha: 0.3)
+                : AppColors.white.withValues(alpha: 0.06),
+                width: 1.2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colorVal,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                statusLabelStr,
+                style: AppTextStyle.body1.copyWith(
+                  color: AppColors.white,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ),
+            if (isSelected)
+              Icon(
+                Icons.check_circle_rounded,
+                color: colorVal,
+                size: 20,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmChangeStatus(String newStatus, String statusLabelStr) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.primaryDarkNavy,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusXL),
+            side: BorderSide(
+              color: AppColors.accentCyan.withValues(alpha: 0.12),
+            ),
+          ),
+          title: Text(
+            'Ubah Status',
+            style: AppTextStyle.h4.copyWith(
+              color: AppColors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            'Apakah Anda yakin ingin mengubah status unit menjadi $statusLabelStr?',
+            style: AppTextStyle.body3.copyWith(color: AppColors.softGray),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(
+                'Batal',
+                style: AppTextStyle.buttonSmall.copyWith(
+                  color: AppColors.softGray,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accentCyan,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                ),
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Ya'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _firestoreService.updateUnit(_unitId, {
+        'status': newStatus,
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Status unit berhasil diperbarui'),
+          backgroundColor: AppColors.successGreen,
+        ),
+      );
+
+      setState(() {
+        _unitFuture = _loadUnitData();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal memperbarui status: $e'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
   Widget _buildLoadingView() {
     return const Center(
       child: CircularProgressIndicator(color: AppColors.accentCyan),
@@ -523,7 +813,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // HEADER SECTION (Sticky)
+
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
           child: Row(
@@ -561,13 +851,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             ],
           ),
         ),
-        // Scrollable Content
         Expanded(
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             children: [
-              // IMAGE SECTION
               Container(
                 padding: const EdgeInsets.all(AppTheme.paddingM),
                 decoration: BoxDecoration(
@@ -661,7 +949,6 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ),
               const SizedBox(height: 16),
 
-              // INFO SECTION
               _buildSectionCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -723,7 +1010,6 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Informasi Unit
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
@@ -750,8 +1036,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ),
               const SizedBox(height: 16),
 
-              // DETAIL SECTION
-              // Detail Unit
+              _buildInteractiveStatusCard(status),
+              const SizedBox(height: 16),
+
               _buildSectionCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -816,12 +1103,6 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       ),
                       const SizedBox(height: 12),
                       _buildInfoTile(
-                        label: 'Status',
-                        value: _statusLabel(status),
-                        icon: Icons.verified_rounded,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInfoTile(
                         label: 'Deskripsi',
                         value: unitData['deskripsi']?.toString() ?? '-',
                         icon: Icons.description_rounded,
@@ -832,8 +1113,6 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ),
               const SizedBox(height: 16),
 
-              // FASILITAS SECTION
-              // Fasilitas
               _buildSectionCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -865,8 +1144,6 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ),
               const SizedBox(height: 16),
 
-              // GAME SECTION
-              // Game
               _buildSectionCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

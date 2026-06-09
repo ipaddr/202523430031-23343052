@@ -41,7 +41,7 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
     super.dispose();
   }
 
-  // ─── Verifikasi Station ───────────────────────────────────────────────────
+  // Verifikasi Station
 
   /// Setujui game station: ubah statusVerifikasi → 'verified' di Firestore.
   Future<void> _approveStation(
@@ -1111,3 +1111,4 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
     );
   }
 }
+

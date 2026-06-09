@@ -21,13 +21,13 @@ class PaymentService {
     String bookingId, {
     String metodePembayaran = 'QRIS',
   }) async {
-    // Ambil data booking terlebih dahulu untuk mendapatkan stationId dan totalHarga
     String stationId = '';
     int totalHarga = 0;
     String unitId = '';
     String tanggalBooking = '';
     String jamMulai = '';
     String jamSelesai = '';
+    String userId = '';
 
     try {
       final DocumentSnapshot doc = await _firestore
@@ -45,6 +45,7 @@ class PaymentService {
         tanggalBooking = data['tanggalBooking']?.toString() ?? '';
         jamMulai = data['jamMulai']?.toString() ?? '';
         jamSelesai = data['jamSelesai']?.toString() ?? '';
+        userId = data['userId']?.toString() ?? '';
       }
     } catch (e) {
       debugPrint('PaymentService: Gagal mengambil data booking awal — $e');
@@ -53,20 +54,61 @@ class PaymentService {
     // Langkah 1: Update status pembayaran booking & totalPemasukan stasiun secara atomik
     try {
       await _firestore.runTransaction((transaction) async {
-        final DocumentReference bookingRef = _firestore.collection('bookings').doc(bookingId);
+        final DocumentReference bookingRef = _firestore
+            .collection('bookings')
+            .doc(bookingId);
 
-        // 1. Update Booking
         transaction.update(bookingRef, {
           'statusPembayaran': 'paid',
+          'statusBooking': 'pending_confirmation',
           'metodePembayaran': metodePembayaran,
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
-        // 2. Increment totalPemasukan stasiun
         if (stationId.isNotEmpty) {
-          final DocumentReference stationRef = _firestore.collection('stations').doc(stationId);
+          final DocumentReference stationRef = _firestore
+              .collection('stations')
+              .doc(stationId);
           transaction.update(stationRef, {
             'totalPemasukan': FieldValue.increment(totalHarga),
+          });
+        }
+
+        if (userId.isNotEmpty) {
+          final DocumentReference userNotifRef = _firestore
+              .collection('notifications')
+              .doc();
+          transaction.set(userNotifRef, {
+            'userId': userId,
+            'targetId': userId,
+            'roleTarget': 'user',
+            'stationId': stationId,
+            'bookingId': bookingId,
+            'relatedBookingId': bookingId,
+            'type': 'payment_success',
+            'title': 'Pembayaran Berhasil',
+            'message':
+                'Pembayaran berhasil. Booking sedang menunggu konfirmasi Game Station.',
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+          final DocumentReference adminNotifRef = _firestore
+              .collection('notifications')
+              .doc();
+          transaction.set(adminNotifRef, {
+            'userId': userId,
+            'targetId': userId,
+            'roleTarget': 'admin',
+            'stationId': stationId,
+            'bookingId': bookingId,
+            'relatedBookingId': bookingId,
+            'type': 'payment_received',
+            'title': 'Pembayaran Berhasil',
+            'message':
+                'User telah melakukan pembayaran dan menunggu konfirmasi.',
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
           });
         }
       });

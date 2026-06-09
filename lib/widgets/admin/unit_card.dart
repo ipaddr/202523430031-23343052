@@ -51,6 +51,7 @@ class UnitCard extends StatelessWidget {
     if (lower == 'digunakan') return AppColors.errorRed;
     if (lower == 'tersedia') return AppColors.successGreen;
     if (lower == 'perawatan') return AppColors.warningOrange;
+    if (lower == 'tidak_aktif' || lower == 'tidak_tersedia' || lower == 'inactive') return AppColors.softGray;
     return AppColors.lightText;
   }
 
@@ -59,6 +60,7 @@ class UnitCard extends StatelessWidget {
     if (lower == 'digunakan') return 'Digunakan';
     if (lower == 'tersedia') return 'Tersedia';
     if (lower == 'perawatan') return 'Perawatan';
+    if (lower == 'tidak_aktif' || lower == 'tidak_tersedia' || lower == 'inactive') return 'Tidak Tersedia';
     return status.isEmpty ? 'Unknown' : status;
   }
 

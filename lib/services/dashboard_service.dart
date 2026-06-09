@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:gamezone/utils/helpers.dart';
 import 'package:gamezone/widgets/admin/unit_filter_bar.dart';
 
-// Dashboard Summary
+// Kelas ringkasan data dashboard admin.
 class DashboardAdminSummary {
   final int totalBooking;
   final int totalUnit;
@@ -68,7 +68,6 @@ class DashboardService {
   DashboardService({FirebaseFirestore? firestore})
     : _db = firestore ?? FirebaseFirestore.instance;
 
-  // =========================
   // Ringkasan Dashboard
   Future<DashboardAdminSummary> getDashboardAdminSummary({
     int recentLimit = 5,
@@ -119,9 +118,7 @@ class DashboardService {
     );
   }
 
-  // =========================
-  // ACTIVITY ANALYTICS
-  // =========================
+  // Analitik Aktivitas
 
   Future<List<RecentActivityData>> getAktivitasTerbaru({int limit = 5}) async {
     final activities = <RecentActivityData>[];
@@ -359,12 +356,10 @@ class DashboardService {
     }
   }
 
-  // =========================
-  // UNIT ANALYTICS
-  // =========================
+  // Analitik Unit
 
-  // Map QueryDocumentSnapshot list to a normalized list of maps with id/data
-  // and sort by unit name.
+  // Ubah daftar QueryDocumentSnapshot menjadi list map ternormalisasi berisi id/data
+  // dan urutkan berdasarkan nama unit.
   List<Map<String, dynamic>> mapUnitDocs(
     List<QueryDocumentSnapshot<Object?>> docs,
   ) {
@@ -383,8 +378,8 @@ class DashboardService {
     return entries;
   }
 
-  // Apply status filter to a list of mapped unit entries (each entry is
-  // {'id':..., 'data': {...}}). Returns filtered list.
+  // Terapkan filter status ke list entri unit yang sudah dipetakan (setiap entri
+  // berbentuk {'id':..., 'data': {...}}). Mengembalikan list yang sudah difilter.
   List<Map<String, dynamic>> applyStatusFilterToMappedEntries(
     List<Map<String, dynamic>> mappedEntries,
     UnitStatusFilter selectedStatus,
@@ -403,7 +398,7 @@ class DashboardService {
         .toList(growable: false);
   }
 
-  // Lightweight analytics summary for a set of mapped entries.
+  // Ringkasan analitik ringan dari sekumpulan entri yang sudah dipetakan.
   UnitOverview buildUnitOverviewFromMappedEntries(
     List<Map<String, dynamic>> mappedEntries,
   ) {
@@ -445,7 +440,6 @@ class DashboardService {
     );
   }
 
-  // Statistik Unit
   Future<int> getTotalUnits() async {
     try {
       final snapshot = await _db.collection('units').get();
@@ -566,11 +560,8 @@ class DashboardService {
     }
   }
 
-  // =========================
-  // REVENUE ANALYTICS
-  // =========================
+  // Analitik Pendapatan
 
-  // Membaca booking
   Future<int> getTotalPemasukan() async {
     try {
       final DateTime now = DateTime.now();
@@ -606,9 +597,7 @@ class DashboardService {
     }
   }
 
-  // =========================
-  // RATING ANALYTICS
-  // =========================
+  // Analitik Rating
 
   Future<double> getRatingGameStation() async {
     try {
@@ -683,9 +672,7 @@ class DashboardService {
     }
   }
 
-  // =========================
-  // UNIT HELPERS (internal)
-  // =========================
+  // Helper Unit (internal)
 
   Future<int> _getUnitCountByType({
     String? stationId,
@@ -772,7 +759,6 @@ class DashboardService {
     }
   }
 
-  // Statistik Booking
   Future<int> getTotalBooking() async {
     try {
       final snapshot = await _db.collection('bookings').get();
@@ -834,9 +820,7 @@ class DashboardService {
     }
   }
 
-  // -------------------------
-  // Helpers (used by dashboard logic)
-  // -------------------------
+  // Helper pendukung logika dashboard.
 
   Future<Map<String, dynamic>?> getStationData(String stationId) async {
     final doc = await _db.collection('stations').doc(stationId).get();

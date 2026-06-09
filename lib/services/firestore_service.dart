@@ -14,14 +14,89 @@ class FirestoreService {
         firestore: firestore ?? FirebaseFirestore.instance,
       );
 
-  // ── User ──────────────────────────────────────────────────────────────────
+  // Helper Notifikasi Standar
+
+  Future<void> _sendNotificationHelper({
+    required String targetId,
+    required String roleTarget,
+    String? stationId,
+    String? bookingId,
+    required String type,
+    required String title,
+    required String message,
+  }) async {
+    try {
+      final String notifId = _db.collection('notifications').doc().id;
+      final payload = {
+        'userId': targetId,
+        'targetId': targetId,
+        'roleTarget': roleTarget,
+        'stationId': stationId ?? '',
+        'bookingId': bookingId ?? '',
+        'relatedBookingId': bookingId ?? '',
+        'type': type,
+        'title': title,
+        'message': message,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+      await _db.collection('notifications').doc(notifId).set(payload);
+      debugPrint(
+        'FirestoreService Notification Sent: $title ($type) untuk $roleTarget',
+      );
+    } catch (e) {
+      debugPrint('Error sending notification: $e');
+    }
+  }
+
+  void _addNotificationToBatch(
+    WriteBatch batch, {
+    required String targetId,
+    required String roleTarget,
+    String? stationId,
+    String? bookingId,
+    required String type,
+    required String title,
+    required String message,
+  }) {
+    final DocumentReference notifRef = _db.collection('notifications').doc();
+    batch.set(notifRef, {
+      'userId': targetId,
+      'targetId': targetId,
+      'roleTarget': roleTarget,
+      'stationId': stationId ?? '',
+      'bookingId': bookingId ?? '',
+      'relatedBookingId': bookingId ?? '',
+      'type': type,
+      'title': title,
+      'message': message,
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // User
 
   Future<Map<String, dynamic>?> getUserData(String userId) async {
     final doc = await _db.collection('users').doc(userId).get();
     return doc.data();
   }
 
-  // ── Station ───────────────────────────────────────────────────────────────
+  Future<Map<String, dynamic>?> getUserByEmail(String email) async {
+    final snap = await _db
+        .collection('users')
+        .where('email', isEqualTo: email.trim())
+        .limit(1)
+        .get();
+    if (snap.docs.isNotEmpty) {
+      final data = snap.docs.first.data();
+      data['id'] = snap.docs.first.id;
+      return data;
+    }
+    return null;
+  }
+
+  // Station
 
   Future<Map<String, dynamic>?> getStationByOwnerId(
     String ownerId, {
@@ -99,7 +174,7 @@ class FirestoreService {
     return null;
   }
 
-  // ── Units ─────────────────────────────────────────────────────────────────
+  // Units
 
   Stream<QuerySnapshot> getUnitsStreamByStation(String stationId) {
     return _db
@@ -119,13 +194,12 @@ class FirestoreService {
     return _db.collection('units').doc(unitId).get();
   }
 
-  // ── Bookings ──────────────────────────────────────────────────────────────
+  // Bookings
 
   Stream<QuerySnapshot> getBookingsStreamByStation(String stationId) {
     return _db
         .collection('bookings')
         .where('stationId', isEqualTo: stationId)
-        .orderBy('createdAt', descending: true)
         .snapshots();
   }
 
@@ -141,6 +215,77 @@ class FirestoreService {
   }
 
   Future<void> createBooking(Map<String, dynamic> bookingData) async {
+    final String unitId = bookingData['unitId']?.toString() ?? '';
+    final String tanggalBooking = bookingData['tanggalBooking']?.toString() ?? '';
+    final String jamMulai = bookingData['jamMulai']?.toString() ?? '';
+    final String jamSelesai = bookingData['jamSelesai']?.toString() ?? '';
+
+    if (unitId.isNotEmpty) {
+      final DocumentSnapshot unitSnap = await _db
+          .collection('units')
+          .doc(unitId)
+          .get();
+      if (unitSnap.exists) {
+        final Map<String, dynamic> currentUnitData =
+            unitSnap.data() as Map<String, dynamic>? ?? {};
+        final String currentStatus = (currentUnitData['status'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        if (currentStatus == 'perawatan' ||
+            currentStatus == 'maintenance' ||
+            currentStatus == 'tidak_aktif' ||
+            currentStatus == 'tidak_tersedia' ||
+            currentStatus == 'inactive') {
+          throw Exception('Unit tidak tersedia untuk dipesan.');
+        }
+      }
+    }
+
+    // Cek bentrok jadwal dengan booking lain yang sudah dibayar atau aktif
+    if (unitId.isNotEmpty && tanggalBooking.isNotEmpty && jamMulai.isNotEmpty && jamSelesai.isNotEmpty) {
+      final bookingsSnap = await _db
+          .collection('bookings')
+          .where('unitId', isEqualTo: unitId)
+          .where('tanggalBooking', isEqualTo: tanggalBooking)
+          .get();
+
+      final int newStart = _timeStrToMinutes(jamMulai);
+      final int newEnd = _timeStrToMinutes(jamSelesai);
+
+      for (final doc in bookingsSnap.docs) {
+        final data = doc.data();
+        final String statusBooking = (data['statusBooking'] ?? '').toString().toLowerCase();
+        final String statusPembayaran = (data['statusPembayaran'] ?? '').toString().toLowerCase();
+
+        // Abaikan status terminal
+        if (statusBooking == 'cancelled' ||
+            statusBooking == 'rejected' ||
+            statusBooking == 'completed' ||
+            statusBooking == 'expired' ||
+            statusPembayaran == 'expired' ||
+            statusPembayaran == 'cancelled') {
+          continue;
+        }
+
+        // Blokir jika booking lain sudah paid atau statusnya aktif (pending_confirmation, confirmed, active, checkin)
+        final bool isPaid = statusPembayaran == 'paid';
+        final bool isActiveStatus = statusBooking == 'pending_confirmation' ||
+            statusBooking == 'confirmed' ||
+            statusBooking == 'active' ||
+            statusBooking == 'checkin';
+
+        if (isPaid || isActiveStatus) {
+          final int existStart = _timeStrToMinutes(data['jamMulai']?.toString() ?? '00:00');
+          final int existEnd = _timeStrToMinutes(data['jamSelesai']?.toString() ?? '00:00');
+
+          if (newStart < existEnd && newEnd > existStart) {
+            throw Exception('Jadwal tersebut sudah dibooking oleh pengguna lain.');
+          }
+        }
+      }
+    }
+
     final String? bookingId = bookingData['bookingId']?.toString();
     final String generatedId = bookingId != null && bookingId.isNotEmpty
         ? bookingId
@@ -153,35 +298,51 @@ class FirestoreService {
 
     await _db.collection('bookings').doc(generatedId).set(payload);
 
-    // Kirim notifikasi in-app
     try {
       final String uId = payload['userId']?.toString() ?? '';
+      final String stationId = payload['stationId']?.toString() ?? '';
       if (uId.isNotEmpty) {
         // Notifikasi untuk User
-        final userNotifId = _db.collection('notifications').doc().id;
-        await _db.collection('notifications').doc(userNotifId).set({
-          'userId': uId,
-          'roleTarget': 'user',
-          'title': 'Booking Berhasil Dibuat',
-          'message': 'Booking berhasil dibuat. Silakan lakukan pembayaran.',
-          'type': 'booking_created',
-          'isRead': false,
-          'relatedBookingId': generatedId,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        await _sendNotificationHelper(
+          targetId: uId,
+          roleTarget: 'user',
+          stationId: stationId,
+          bookingId: generatedId,
+          type: 'booking_created',
+          title: 'Booking Berhasil Dibuat',
+          message: 'Booking berhasil dibuat dan menunggu pembayaran.',
+        );
 
         // Notifikasi untuk Admin
-        final adminNotifId = _db.collection('notifications').doc().id;
-        await _db.collection('notifications').doc(adminNotifId).set({
-          'userId': uId,
-          'roleTarget': 'admin',
-          'title': 'Booking Baru Masuk',
-          'message': 'Booking baru menunggu pembayaran.',
-          'type': 'booking_created',
-          'isRead': false,
-          'relatedBookingId': generatedId,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        await _sendNotificationHelper(
+          targetId: uId, // gunakan uId sebagai targetId (bukan ownerId)
+          roleTarget: 'admin',
+          stationId: stationId,
+          bookingId: generatedId,
+          type: 'booking_received',
+          title: 'Booking Baru Masuk',
+          message: 'Ada booking baru yang memerlukan tindakan.',
+        );
+
+        // Pengecekan booking pertama untuk stasiun (station_first_booking) -> ke Superadmin
+        if (stationId.isNotEmpty) {
+          final bookingsSnap = await _db
+              .collection('bookings')
+              .where('stationId', isEqualTo: stationId)
+              .limit(2)
+              .get();
+          if (bookingsSnap.docs.length <= 1) {
+            await _sendNotificationHelper(
+              targetId: 'superadmin',
+              roleTarget: 'superadmin',
+              stationId: stationId,
+              bookingId: generatedId,
+              type: 'station_first_booking',
+              title: 'Booking Pertama Game Station',
+              message: 'Game Station menerima booking pertamanya!',
+            );
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error generating notification in createBooking: $e');
@@ -208,125 +369,164 @@ class FirestoreService {
         final data = snap.data();
         if (data != null) {
           final String uId = data['userId']?.toString() ?? '';
-
-          // Konfigurasi Notifikasi berdasarkan status yang diupdate
-          String title = '';
-          String message = '';
-          String type = '';
+          final String stationId = data['stationId']?.toString() ?? '';
 
           if (updates.containsKey('statusBooking')) {
             final String newStatus = updates['statusBooking'];
-            
+
             // Sinkronisasi status unit (room/PC) ke 'digunakan' atau 'tersedia'
             final String unitId = data['unitId']?.toString() ?? '';
             if (unitId.isNotEmpty) {
-              if (newStatus == 'confirmed' || newStatus == 'checkin' || newStatus == 'active') {
+              if (newStatus == 'confirmed' ||
+                  newStatus == 'checkin' ||
+                  newStatus == 'active') {
                 await _db.collection('units').doc(unitId).update({
                   'status': 'digunakan',
                   'updatedAt': FieldValue.serverTimestamp(),
                 });
-                debugPrint('FirestoreService: status unit $unitId diubah menjadi digunakan karena status booking: $newStatus');
-              } else if (newStatus == 'completed' || newStatus == 'cancelled' || newStatus == 'rejected') {
+                debugPrint(
+                  'FirestoreService: status unit $unitId diubah menjadi digunakan karena status booking: $newStatus',
+                );
+              } else if (newStatus == 'completed' ||
+                  newStatus == 'cancelled' ||
+                  newStatus == 'rejected') {
                 await _db.collection('units').doc(unitId).update({
                   'status': 'tersedia',
                   'updatedAt': FieldValue.serverTimestamp(),
                 });
-                debugPrint('FirestoreService: status unit $unitId diubah menjadi tersedia karena status booking: $newStatus');
+                debugPrint(
+                  'FirestoreService: status unit $unitId diubah menjadi tersedia karena status booking: $newStatus',
+                );
               }
             }
 
             if (newStatus == 'confirmed') {
-              title = 'Booking Dikonfirmasi';
-              message = 'Booking Anda telah dikonfirmasi oleh admin.';
-              type = 'booking_confirmed';
-            } else if (newStatus == 'cancelled') {
-              title = 'Booking Dibatalkan';
-              message = 'Booking Anda ditolak atau dibatalkan.';
-              type = 'booking_cancelled';
+              // USER: booking_confirmed
+              await _sendNotificationHelper(
+                targetId: uId,
+                roleTarget: 'user',
+                stationId: stationId,
+                bookingId: bookingId,
+                type: 'booking_confirmed',
+                title: 'Booking Diterima',
+                message: 'Booking Anda telah diterima oleh Game Station.',
+              );
+
+              // ADMIN: booking_today (jika tanggalBooking hari ini)
+              final String tanggalBooking =
+                  data['tanggalBooking']?.toString() ?? '';
+              final String todayDate = DateTime.now()
+                  .toIso8601String()
+                  .substring(0, 10);
+              if (tanggalBooking == todayDate) {
+                await _sendNotificationHelper(
+                  targetId: uId,
+                  roleTarget: 'admin',
+                  stationId: stationId,
+                  bookingId: bookingId,
+                  type: 'booking_today',
+                  title: 'Jadwal Bermain Hari Ini',
+                  message: 'Hari ini terdapat booking jadwal bermain.',
+                );
+              }
             } else if (newStatus == 'rejected') {
-              title = 'Booking Ditolak';
-              message = 'Booking Anda ditolak oleh admin.';
-              type = 'booking_rejected';
-            } else if (newStatus == 'checkin' || newStatus == 'active') {
-              title = 'Check-In Berhasil';
-              message = 'Check-in berhasil. Selamat bermain.';
-              type = 'booking_checkin';
+              // USER: booking_rejected
+              await _sendNotificationHelper(
+                targetId: uId,
+                roleTarget: 'user',
+                stationId: stationId,
+                bookingId: bookingId,
+                type: 'booking_rejected',
+                title: 'Booking Ditolak',
+                message: 'Booking Anda ditolak oleh Game Station.',
+              );
+            } else if (newStatus == 'cancelled') {
+              // USER: booking_cancelled
+              await _sendNotificationHelper(
+                targetId: uId,
+                roleTarget: 'user',
+                stationId: stationId,
+                bookingId: bookingId,
+                type: 'booking_cancelled',
+                title: 'Booking Dibatalkan Otomatis',
+                message:
+                    'Booking dibatalkan karena pembayaran tidak diselesaikan.',
+              );
+              // ADMIN: booking_cancelled
+              await _sendNotificationHelper(
+                targetId: uId,
+                roleTarget: 'admin',
+                stationId: stationId,
+                bookingId: bookingId,
+                type: 'booking_cancelled',
+                title: 'Booking Dibatalkan Otomatis',
+                message:
+                    'Booking dibatalkan karena pembayaran tidak diselesaikan.',
+              );
             } else if (newStatus == 'completed') {
-              title = 'Booking Selesai';
-              message = 'Booking telah selesai. Berikan rating dan review Anda.';
-              type = 'booking_completed';
-            }
-          } else if (updates.containsKey('statusPembayaran')) {
-            final String newPay = updates['statusPembayaran'];
-            if (newPay == 'paid') {
-              title = 'Pembayaran Berhasil';
-              message = 'Pembayaran berhasil. Menunggu konfirmasi admin.';
-              type = 'payment_success';
-            } else if (newPay == 'expired') {
-              title = 'Pembayaran Expired';
-              message = 'Booking dibatalkan karena pembayaran melewati batas waktu.';
-              type = 'payment_expired';
-            } else if (newPay == 'cancelled') {
-              title = 'Booking Dibatalkan';
-              message = 'Booking dibatalkan karena slot telah digunakan oleh booking lain yang berhasil dibayar.';
-              type = 'booking_cancelled';
+              // USER: booking_completed
+              await _sendNotificationHelper(
+                targetId: uId,
+                roleTarget: 'user',
+                stationId: stationId,
+                bookingId: bookingId,
+                type: 'booking_completed',
+                title: 'Sesi Bermain Selesai',
+                message:
+                    'Sesi bermain Anda telah selesai. Jangan lupa berikan rating dan review untuk Game Station.',
+              );
             }
           }
 
-          if (type.isNotEmpty && uId.isNotEmpty) {
-            // 1. Kirim notifikasi untuk User
-            final userNotifId = _db.collection('notifications').doc().id;
-            await _db.collection('notifications').doc(userNotifId).set({
-              'userId': uId,
-              'roleTarget': 'user',
-              'title': title,
-              'message': message,
-              'type': type,
-              'isRead': false,
-              'relatedBookingId': bookingId,
-              'createdAt': FieldValue.serverTimestamp(),
-            });
-
-            // 2. Kirim notifikasi untuk Admin dengan pesan penyesuaian khusus Admin
-            String adminTitle = title;
-            String adminMessage = message;
-            
-            final String shortId = bookingId.length > 5 ? '${bookingId.substring(0, 5)}...' : bookingId;
-
-            if (type == 'booking_confirmed') {
-              adminTitle = 'Booking Dikonfirmasi';
-              adminMessage = 'Booking #$shortId telah dikonfirmasi.';
-            } else if (type == 'booking_cancelled') {
-              adminTitle = 'Booking Dibatalkan';
-              adminMessage = 'Booking #$shortId telah dibatalkan.';
-            } else if (type == 'booking_rejected') {
-              adminTitle = 'Booking Ditolak';
-              adminMessage = 'Booking #$shortId telah ditolak.';
-            } else if (type == 'booking_checkin') {
-              adminTitle = 'Check-In Berhasil';
-              adminMessage = 'Booking #$shortId berhasil check-in.';
-            } else if (type == 'booking_completed') {
-              adminTitle = 'Booking Selesai';
-              adminMessage = 'Booking #$shortId telah selesai.';
-            } else if (type == 'payment_success') {
-              adminTitle = 'Booking Menunggu Konfirmasi';
-              adminMessage = 'Booking #$shortId telah dibayar. Menunggu konfirmasi Anda.';
-            } else if (type == 'payment_expired') {
-              adminTitle = 'Booking Expired';
-              adminMessage = 'Booking #$shortId dibatalkan karena batas waktu pembayaran habis.';
+          if (updates.containsKey('statusPembayaran')) {
+            final String newPay = updates['statusPembayaran'];
+            if (newPay == 'paid') {
+              // USER: payment_success
+              await _sendNotificationHelper(
+                targetId: uId,
+                roleTarget: 'user',
+                stationId: stationId,
+                bookingId: bookingId,
+                type: 'payment_success',
+                title: 'Pembayaran Berhasil',
+                message:
+                    'Pembayaran berhasil. Booking sedang menunggu konfirmasi Game Station.',
+              );
+              // ADMIN: payment_received
+              await _sendNotificationHelper(
+                targetId: uId,
+                roleTarget: 'admin',
+                stationId: stationId,
+                bookingId: bookingId,
+                type: 'payment_received',
+                title: 'Pembayaran Berhasil',
+                message:
+                    'User telah melakukan pembayaran dan menunggu konfirmasi.',
+              );
+            } else if (newPay == 'expired' || newPay == 'cancelled') {
+              // USER: booking_cancelled
+              await _sendNotificationHelper(
+                targetId: uId,
+                roleTarget: 'user',
+                stationId: stationId,
+                bookingId: bookingId,
+                type: 'booking_cancelled',
+                title: 'Booking Dibatalkan Otomatis',
+                message:
+                    'Booking dibatalkan karena pembayaran tidak diselesaikan.',
+              );
+              // ADMIN: booking_cancelled
+              await _sendNotificationHelper(
+                targetId: uId,
+                roleTarget: 'admin',
+                stationId: stationId,
+                bookingId: bookingId,
+                type: 'booking_cancelled',
+                title: 'Booking Dibatalkan Otomatis',
+                message:
+                    'Booking dibatalkan karena pembayaran tidak diselesaikan.',
+              );
             }
-
-            final adminNotifId = _db.collection('notifications').doc().id;
-            await _db.collection('notifications').doc(adminNotifId).set({
-              'userId': uId,
-              'roleTarget': 'admin',
-              'title': adminTitle,
-              'message': adminMessage,
-              'type': type,
-              'isRead': false,
-              'relatedBookingId': bookingId,
-              'createdAt': FieldValue.serverTimestamp(),
-            });
           }
         }
       }
@@ -336,9 +536,7 @@ class FirestoreService {
   }
 
   Future<void> cancelBooking(String bookingId) async {
-    await updateBooking(bookingId, {
-      'statusBooking': 'cancelled',
-    });
+    await updateBooking(bookingId, {'statusBooking': 'cancelled'});
   }
 
   /// Memeriksa booking milik [userId] yang masih pending/unpaid dan sudah
@@ -388,6 +586,33 @@ class FirestoreService {
             'statusBooking': 'cancelled',
             'updatedAt': FieldValue.serverTimestamp(),
           });
+
+          final String stationId = data['stationId']?.toString() ?? '';
+
+          // USER: booking_cancelled
+          _addNotificationToBatch(
+            batch,
+            targetId: userId,
+            roleTarget: 'user',
+            stationId: stationId,
+            bookingId: doc.id,
+            type: 'booking_cancelled',
+            title: 'Booking Dibatalkan Otomatis',
+            message: 'Booking dibatalkan karena pembayaran tidak diselesaikan.',
+          );
+
+          // ADMIN: booking_cancelled
+          _addNotificationToBatch(
+            batch,
+            targetId: userId,
+            roleTarget: 'admin',
+            stationId: stationId,
+            bookingId: doc.id,
+            type: 'booking_cancelled',
+            title: 'Booking Dibatalkan Otomatis',
+            message: 'Booking dibatalkan karena pembayaran tidak diselesaikan.',
+          );
+
           expiredCount++;
         }
       }
@@ -401,6 +626,109 @@ class FirestoreService {
       }
     } catch (e) {
       debugPrint('expireOverdueBookings error: $e');
+    }
+  }
+
+  /// Membaca semua booking aktif ('active') dan menyelesaikan otomatis jika
+  /// waktu sewa (tanggalBooking + jamSelesai) sudah terlewati.
+  /// Dipanggil di berbagai entry point halaman admin & user.
+  Future<void> completeFinishedBookings({
+    String? userId,
+    String? stationId,
+  }) async {
+    try {
+      Query<Map<String, dynamic>> query = _db
+          .collection('bookings')
+          .where('statusBooking', whereIn: const ['active', 'checkin']);
+
+      if (userId != null && userId.isNotEmpty) {
+        query = query.where('userId', isEqualTo: userId);
+      }
+      if (stationId != null && stationId.isNotEmpty) {
+        query = query.where('stationId', isEqualTo: stationId);
+      }
+
+      final snap = await query.get();
+      if (snap.docs.isEmpty) return;
+
+      final DateTime now = DateTime.now();
+      final WriteBatch batch = _db.batch();
+      int completedCount = 0;
+
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final String tanggalBooking = data['tanggalBooking']?.toString() ?? '';
+        final String jamSelesai = data['jamSelesai']?.toString() ?? '';
+        final String unitId = data['unitId']?.toString() ?? '';
+        final String uId = data['userId']?.toString() ?? '';
+        final String statId = data['stationId']?.toString() ?? '';
+
+        if (tanggalBooking.isEmpty || jamSelesai.isEmpty) continue;
+
+        final DateTime? endTime = _parseBookingEndTime(tanggalBooking, jamSelesai);
+        if (endTime == null) continue;
+
+        if (now.isAfter(endTime) || now.isAtSameMomentAs(endTime)) {
+          // 1. Update Booking status to completed
+          batch.update(doc.reference, {
+            'statusBooking': 'completed',
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+          // 2. Revert Unit status to tersedia
+          if (unitId.isNotEmpty) {
+            batch.update(_db.collection('units').doc(unitId), {
+              'status': 'tersedia',
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+
+          // 3. Create Notification for user
+          if (uId.isNotEmpty) {
+            _addNotificationToBatch(
+              batch,
+              targetId: uId,
+              roleTarget: 'user',
+              stationId: statId,
+              bookingId: doc.id,
+              type: 'booking_completed',
+              title: 'Sesi Bermain Selesai',
+              message:
+                  'Sesi bermain Anda telah selesai. Jangan lupa berikan rating dan review untuk Game Station.',
+            );
+          }
+
+          completedCount++;
+        }
+      }
+
+      if (completedCount > 0) {
+        await batch.commit();
+        debugPrint(
+          'FirestoreService: $completedCount booking otomatis diselesaikan.',
+        );
+      }
+    } catch (e) {
+      debugPrint('completeFinishedBookings error: $e');
+    }
+  }
+
+  DateTime? _parseBookingEndTime(String tanggalBooking, String jamSelesai) {
+    try {
+      final cleanTime = jamSelesai.replaceAll('.', ':');
+      final timeParts = cleanTime.split(':');
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+
+      final dateParts = tanggalBooking.split('-');
+      final year = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final day = int.parse(dateParts[2]);
+
+      return DateTime(year, month, day, hour, minute);
+    } catch (e) {
+      debugPrint('Error parsing booking end time: $e');
+      return null;
     }
   }
 
@@ -577,7 +905,7 @@ class FirestoreService {
         .get();
   }
 
-  // ── Analytics (delegated to DashboardService) ─────────────────────────────
+  // Analytics (didelegasikan ke DashboardService)
 
   Future<int> getTotalUnits() async => _dashboard.getTotalUnits();
   Future<int> getStationTotalUnits(String stationId) async =>
@@ -657,7 +985,7 @@ class FirestoreService {
   Future<List<RecentActivityData>> getAktivitasTerbaru({int limit = 5}) async =>
       _dashboard.getAktivitasTerbaru(limit: limit);
 
-  // ── Station CRUD ──────────────────────────────────────────────────────────
+  // Station CRUD (Buat/Baca/Ubah/Hapus)
 
   Future<void> createStation(
     String stationId,
@@ -700,10 +1028,30 @@ class FirestoreService {
     });
     if (status == 'verified') {
       batch.update(_db.collection('users').doc(ownerId), {'status': 'active'});
+      _addNotificationToBatch(
+        batch,
+        targetId: 'superadmin',
+        roleTarget: 'superadmin',
+        stationId: stationId,
+        bookingId: '',
+        type: 'admin_verified',
+        title: 'Admin Diterima',
+        message: 'Game Station berhasil diverifikasi.',
+      );
     } else if (status == 'rejected') {
       batch.update(_db.collection('users').doc(ownerId), {
         'status': 'rejected',
       });
+      _addNotificationToBatch(
+        batch,
+        targetId: 'superadmin',
+        roleTarget: 'superadmin',
+        stationId: stationId,
+        bookingId: '',
+        type: 'admin_rejected',
+        title: 'Admin Ditolak',
+        message: 'Pengajuan Game Station ditolak.',
+      );
     }
     await batch.commit();
   }
@@ -720,10 +1068,20 @@ class FirestoreService {
         'status': 'rejected',
       });
     }
+    _addNotificationToBatch(
+      batch,
+      targetId: 'superadmin',
+      roleTarget: 'superadmin',
+      stationId: stationId,
+      bookingId: '',
+      type: 'admin_rejected',
+      title: 'Admin Ditolak',
+      message: 'Pengajuan Game Station ditolak.',
+    );
     await batch.commit();
   }
 
-  // ── User CRUD ─────────────────────────────────────────────────────────────
+  // User CRUD (Buat/Baca/Ubah/Hapus)
 
   Future<void> createUser(String userId, Map<String, dynamic> userData) async =>
       await _db.collection('users').doc(userId).set(userData);
@@ -750,7 +1108,7 @@ class FirestoreService {
     await batch.commit();
   }
 
-  // ── Unit CRUD ─────────────────────────────────────────────────────────────
+  // Unit CRUD (Buat/Baca/Ubah/Hapus)
 
   Future<void> createUnit(Map<String, dynamic> unitData) async {
     final String? unitId = unitData['id']?.toString();

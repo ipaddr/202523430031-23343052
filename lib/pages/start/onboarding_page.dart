@@ -72,7 +72,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
           child: Column(
             children: [
               const SizedBox(height: 12),
-              // Area gambar (tinggi relatif tetap untuk kartu onboarding)
+
               SizedBox(
                 height: MediaQuery.of(context).size.height * 0.55,
                 child: PageView.builder(
@@ -91,7 +91,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   },
                 ),
               ),
-              // Area konten teks dan tombol
+
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -117,7 +117,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         ),
                       ),
                       const SizedBox(height: 30),
-                      // chip: jarak tetap dari subtitle
+
                       Wrap(
                         alignment: WrapAlignment.center,
                         spacing: 10,

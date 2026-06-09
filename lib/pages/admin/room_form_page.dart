@@ -30,6 +30,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
   static const String _statusAvailable = 'tersedia';
   static const String _statusOccupied = 'digunakan';
   static const String _statusMaintenance = 'perawatan';
+  static const String _statusInactive = 'tidak_aktif';
 
   final FirestoreService _firestoreService = FirestoreService();
   final ImagePicker _picker = ImagePicker();
@@ -49,6 +50,8 @@ class _RoomFormPageState extends State<RoomFormPage> {
   final TextEditingController _gameInputController = TextEditingController();
   final TextEditingController _facilityInputController =
       TextEditingController();
+  final TextEditingController _jumlahUnitController =
+      TextEditingController(text: '1');
 
   static const List<String> _gameSuggestions = <String>[
     'Valorant',
@@ -115,6 +118,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
     _deskripsiController.dispose();
     _gameInputController.dispose();
     _facilityInputController.dispose();
+    _jumlahUnitController.dispose();
     super.dispose();
   }
 
@@ -192,6 +196,13 @@ class _RoomFormPageState extends State<RoomFormPage> {
         lower.contains(_statusMaintenance) ||
         lower.contains('maintenance')) {
       return _statusMaintenance;
+    }
+    if (lower.contains('tidak_aktif') ||
+        lower.contains('tidak aktif') ||
+        lower.contains('tidak tersedia') ||
+        lower.contains('inactive') ||
+        lower.contains(_statusInactive)) {
+      return _statusInactive;
     }
     return _statusAvailable;
   }
@@ -499,7 +510,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
       'stationId': _stationId,
       'namaUnit': namaUnit,
       'jenisUnit': _selectedType,
-      'status': _isEditMode ? _selectedStatus : _statusAvailable,
+      'status': _selectedStatus,
       'foto': _photoUrl,
       'hargaPerJam': hargaPerJam,
       'games': List<String>.from(_games),
@@ -616,8 +627,6 @@ class _RoomFormPageState extends State<RoomFormPage> {
       if (_selectedJenisRoom == null || _selectedJenisRoom!.trim().isEmpty) {
         return 'Jenis room wajib diisi';
       }
-    } else if (_noPcController.text.trim().isEmpty) {
-      return 'Nomor PC wajib diisi';
     }
 
     return null;
@@ -687,7 +696,43 @@ class _RoomFormPageState extends State<RoomFormPage> {
       if (_isEditMode && _unitId.isNotEmpty) {
         await _firestoreService.updateUnit(_unitId, payload);
       } else {
-        await _firestoreService.createUnit(payload);
+        if (_selectedType == _jenisUnitPc) {
+          final int jumlah = int.tryParse(_jumlahUnitController.text) ?? 1;
+          if (jumlah > 1) {
+            final String baseName = payload['namaUnit']?.toString() ?? 'PC';
+            for (int i = 1; i <= jumlah; i++) {
+              final String numStr = i.toString().padLeft(2, '0');
+              final Map<String, dynamic> itemPayload = Map<String, dynamic>.from(payload)
+                ..['namaUnit'] = '$baseName $numStr'
+                ..['noPC'] = numStr;
+              await _firestoreService.createUnit(itemPayload);
+            }
+          } else {
+            Map<String, dynamic> itemPayload = Map<String, dynamic>.from(payload);
+            if (!_isEditMode) {
+              final String namaUnit = payload['namaUnit']?.toString() ?? '';
+              final RegExp regex = RegExp(r'\d+$');
+              final Match? match = regex.firstMatch(namaUnit);
+              if (match != null) {
+                itemPayload['noPC'] = match.group(0)!.padLeft(2, '0');
+              } else {
+                try {
+                  final QuerySnapshot snap = await _firestoreService.getUnitsOnceByStation(_stationId);
+                  final int pcCount = snap.docs.where((doc) {
+                    final Map<String, dynamic> d = doc.data() as Map<String, dynamic>;
+                    return d['jenisUnit'] == _jenisUnitPc;
+                  }).length;
+                  itemPayload['noPC'] = (pcCount + 1).toString().padLeft(2, '0');
+                } catch (_) {
+                  itemPayload['noPC'] = '01';
+                }
+              }
+            }
+            await _firestoreService.createUnit(itemPayload);
+          }
+        } else {
+          await _firestoreService.createUnit(payload);
+        }
       }
 
       if (!mounted) {
@@ -1073,6 +1118,63 @@ class _RoomFormPageState extends State<RoomFormPage> {
               decoration: _inputDecoration(hint: 'Harga per jam'),
             ),
           ),
+          const SizedBox(height: 12),
+          _buildFieldGroup(
+            label: 'Status Unit',
+            child: DropdownButtonFormField<String>(
+              initialValue: _selectedStatus,
+              dropdownColor: AppColors.primaryDarkNavy,
+              style: AppTextStyle.body1.copyWith(color: AppColors.white),
+              decoration: _inputDecoration(hint: 'Pilih Status Unit'),
+              items: const [
+                DropdownMenuItem<String>(
+                  value: _statusAvailable,
+                  child: Text('Tersedia'),
+                ),
+                DropdownMenuItem<String>(
+                  value: _statusOccupied,
+                  child: Text('Digunakan'),
+                ),
+                DropdownMenuItem<String>(
+                  value: _statusMaintenance,
+                  child: Text('Perawatan'),
+                ),
+                DropdownMenuItem<String>(
+                  value: _statusInactive,
+                  child: Text('Tidak Tersedia'),
+                ),
+              ],
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _selectedStatus = newValue;
+                  });
+                }
+              },
+            ),
+          ),
+          if (_selectedType == _jenisUnitPc && !_isEditMode) ...[
+            const SizedBox(height: 12),
+            _buildFieldGroup(
+              label: 'Jumlah Unit',
+              child: TextFormField(
+                controller: _jumlahUnitController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Jumlah unit wajib diisi';
+                  }
+                  final int? parsed = int.tryParse(value);
+                  if (parsed == null || parsed <= 0) {
+                    return 'Jumlah unit minimal 1';
+                  }
+                  return null;
+                },
+                decoration: _inputDecoration(hint: 'Jumlah unit'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1090,16 +1192,6 @@ class _RoomFormPageState extends State<RoomFormPage> {
                 'Lengkapi spesifikasi dan informasi PC yang akan digunakan pengguna saat melakukan booking.',
           ),
           const SizedBox(height: 16),
-          _buildFieldGroup(
-            label: 'Nomor PC',
-            child: TextFormField(
-              controller: _noPcController,
-              validator: (String? value) =>
-                  _validateRequiredText(value, 'Nomor PC'),
-              decoration: _inputDecoration(hint: 'Nomor PC'),
-            ),
-          ),
-          const SizedBox(height: 12),
           _buildFieldGroup(
             label: 'Processor',
             child: TextFormField(

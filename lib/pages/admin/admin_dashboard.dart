@@ -11,7 +11,6 @@ import 'package:gamezone/widgets/admin/admin_bottom_navbar.dart';
 import 'package:gamezone/widgets/admin/admin_header.dart';
 import 'package:gamezone/widgets/admin/admin_stat_card.dart';
 import 'package:gamezone/widgets/admin/room_status_chart.dart';
-import 'package:gamezone/utils/helpers.dart';
 import 'package:gamezone/pages/admin/room_page.dart';
 import 'package:gamezone/pages/admin/booking_page.dart';
 import '../profile_page.dart';
@@ -66,6 +65,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     UnitStatusSummary unitStatus;
 
     if (stationId != null && stationId.isNotEmpty) {
+      await _firestoreService.completeFinishedBookings(stationId: stationId);
       final Future<DashboardAdminSummary> summaryFuture = _firestoreService
           .getStationDashboardAdminSummary(stationId);
       final Future<UnitStatusSummary> unitStatusFuture = _firestoreService
@@ -160,7 +160,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header notifikasi booking admin.
               Text(
                 'Notifikasi Booking',
                 style: AppTextStyle.h4.copyWith(
@@ -180,6 +179,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   stream: FirebaseFirestore.instance
                       .collection('notifications')
                       .where('roleTarget', isEqualTo: 'admin')
+                      .where('stationId', isEqualTo: resolvedStationId)
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
@@ -233,8 +233,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       itemCount: docs.length > 20 ? 20 : docs.length,
                       itemBuilder: (context, index) {
                         final data = docs[index].data() as Map<String, dynamic>;
-                        final String title = data['title']?.toString() ?? 'Booking';
-                        final String message = data['message']?.toString() ?? '';
+                        final String title =
+                            data['title']?.toString() ?? 'Booking';
+                        final String message =
+                            data['message']?.toString() ?? '';
                         final Timestamp? createdAt =
                             data['createdAt'] as Timestamp?;
 
@@ -350,27 +352,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  // `readFirstString` moved to widgets/utils.dart and is imported above.
-
-  int _readFirstInt(Map<String, dynamic> data, List<String> keys) {
-    for (final key in keys) {
-      final value = data[key];
-      if (value is int) return value;
-      if (value is double) return value.toInt();
-      if (value is num) return value.toInt();
-      if (value != null) {
-        final parsed = int.tryParse(value.toString());
-        if (parsed != null) return parsed;
-      }
-    }
-    return 0;
-  }
-
-  String _formatCurrency(int value) {
-    if (value <= 0) return '';
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match match) => '${match[1]}.')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final currentUser = _authService.getCurrentUser();
@@ -400,12 +381,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       resizeToAvoidBottomInset: false,
       body: GameZoneBackground(
         child: SafeArea(
-          // Area konten utama tanpa memotong background navbar di bawah.
           bottom: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Menampilkan konten tab aktif admin.
               Expanded(
                 child: FutureBuilder<_DashboardPageData>(
                   future: _dashboardFuture,
@@ -454,9 +433,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         userData?['lastOpenedBookingNotifications']
                             as Timestamp?;
                     final String adminName =
-                        userData?['nama'] ??
-                        userData?['name'] ??
-                        'Admin';
+                        userData?['nama'] ?? userData?['name'] ?? 'Admin';
                     final String stationName =
                         stationData?['namaStation'] ??
                         stationData?['stationName'] ??
@@ -475,9 +452,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       }
                     }
                     avatarUrl ??=
-                        userData?['foto'] ??
-                        userData?['photoUrl'] ??
-                        '';
+                        userData?['foto'] ?? userData?['photoUrl'] ?? '';
 
                     return Center(
                       child: ConstrainedBox(
@@ -528,7 +503,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     : _buildDashboardContent(
                                         summary: data.summary,
                                         unitStatus: data.unitStatus,
-                                        stationId: stationData?['id']?.toString() ?? '',
+                                        stationId:
+                                            stationData?['id']?.toString() ??
+                                            '',
                                       ),
                               ),
                             ),
@@ -539,7 +516,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   },
                 ),
               ),
-              // Menampilkan navigasi bawah khusus admin (Hanya muncul jika keyboard tidak aktif).
+
               if (MediaQuery.of(context).viewInsets.bottom == 0)
                 AdminBottomNavBar(
                   currentIndex: _activeTabIndex,
@@ -649,7 +626,7 @@ class RatingAnalyticsCard extends StatelessWidget {
         final docs = snapshot.data?.docs ?? [];
         final totalReview = docs.length;
 
-        // Sort reviews by createdAt descending
+        // Urutkan ulasan berdasarkan createdAt secara menurun (terbaru di atas)
         final sortedDocs = [...docs];
         sortedDocs.sort((a, b) {
           final aData = a.data() as Map<String, dynamic>;
@@ -682,7 +659,6 @@ class RatingAnalyticsCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header Rating & Total
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -703,7 +679,9 @@ class RatingAnalyticsCard extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             'Ringkasan performa ulasan stasiun game Anda.',
-                            style: AppTextStyle.caption2.copyWith(color: AppColors.softGray),
+                            style: AppTextStyle.caption2.copyWith(
+                              color: AppColors.softGray,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -712,7 +690,10 @@ class RatingAnalyticsCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(10),
@@ -727,7 +708,9 @@ class RatingAnalyticsCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            averageRating > 0 ? averageRating.toStringAsFixed(1) : '0.0',
+                            averageRating > 0
+                                ? averageRating.toStringAsFixed(1)
+                                : '0.0',
                             style: AppTextStyle.body2.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -747,7 +730,7 @@ class RatingAnalyticsCard extends StatelessWidget {
                 ),
               ),
               const Divider(color: Color(0xFF334155), height: 1),
-              
+
               // List Review Terbaru
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -778,10 +761,14 @@ class RatingAnalyticsCard extends StatelessWidget {
                     else
                       ...latestReviews.map((doc) {
                         final data = doc.data() as Map<String, dynamic>;
-                        final String userName = data['userName']?.toString() ?? 'Gamers';
-                        final int rating = (data['rating'] as num?)?.toInt() ?? 5;
-                        final String comment = data['comment']?.toString() ?? '';
-                        final Timestamp? createdAt = data['createdAt'] as Timestamp?;
+                        final String userName =
+                            data['userName']?.toString() ?? 'Gamers';
+                        final int rating =
+                            (data['rating'] as num?)?.toInt() ?? 5;
+                        final String comment =
+                            data['comment']?.toString() ?? '';
+                        final Timestamp? createdAt =
+                            data['createdAt'] as Timestamp?;
                         final String dateStr = createdAt != null
                             ? '${createdAt.toDate().day}/${createdAt.toDate().month}/${createdAt.toDate().year}'
                             : '';
@@ -800,7 +787,8 @@ class RatingAnalyticsCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
                                     child: Text(
@@ -828,7 +816,9 @@ class RatingAnalyticsCard extends StatelessWidget {
                                 children: List.generate(5, (index) {
                                   return Icon(
                                     Icons.star_rounded,
-                                    color: index < rating ? const Color(0xFFF59E0B) : const Color(0xFF475569),
+                                    color: index < rating
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFF475569),
                                     size: 12,
                                   );
                                 }),

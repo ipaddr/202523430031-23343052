@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,7 +9,12 @@ class AuthService {
 
   // Mendapatkan data pengguna yang sedang masuk
   User? getCurrentUser() {
-    return _auth.currentUser;
+    final user = _auth.currentUser;
+    if (user != null) {
+      final providers = user.providerData.map((p) => p.providerId).toList();
+      debugPrint("ACTIVE PROVIDERS (getCurrentUser): ${providers.join(', ')}");
+    }
+    return user;
   }
 
   // Menunggu sesi auth benar-benar siap jika currentUser belum terbaca saat awal.
@@ -17,14 +23,21 @@ class AuthService {
   }) async {
     final User? currentUser = _auth.currentUser;
     if (currentUser != null) {
+      final providers = currentUser.providerData.map((p) => p.providerId).toList();
+      debugPrint("ACTIVE PROVIDERS (resolveCurrentUser): ${providers.join(', ')}");
       return currentUser;
     }
 
     try {
-      return await _auth
+      final resolved = await _auth
           .authStateChanges()
           .firstWhere((user) => user != null)
           .timeout(timeout);
+      if (resolved != null) {
+        final providers = resolved.providerData.map((p) => p.providerId).toList();
+        debugPrint("ACTIVE PROVIDERS (resolveCurrentUser resolved): ${providers.join(', ')}");
+      }
+      return resolved;
     } catch (_) {
       return null;
     }
@@ -35,10 +48,15 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    return await _auth.signInWithEmailAndPassword(
+    final cred = await _auth.signInWithEmailAndPassword(
       email: email,
       password: password,
     );
+    if (cred.user != null) {
+      final providers = cred.user!.providerData.map((p) => p.providerId).toList();
+      debugPrint("ACTIVE PROVIDERS (signInWithEmailAndPassword): ${providers.join(', ')}");
+    }
+    return cred;
   }
 
   // Masuk menggunakan akun Google
@@ -63,7 +81,12 @@ class AuthService {
       idToken: googleAuth.idToken,
     );
 
-    return await _auth.signInWithCredential(credential);
+    final cred = await _auth.signInWithCredential(credential);
+    if (cred.user != null) {
+      final providers = cred.user!.providerData.map((p) => p.providerId).toList();
+      debugPrint("ACTIVE PROVIDERS (signInWithGoogle): ${providers.join(', ')}");
+    }
+    return cred;
   }
 
   /// Membangun Google OAuthCredential dari GoogleSignInAccount tanpa
@@ -91,9 +114,35 @@ class AuthService {
     }
     try {
       await user.linkWithCredential(googleCredential);
+      final providers = user.providerData.map((p) => p.providerId).toList();
+      debugPrint("ACTIVE PROVIDERS (linkGoogleToCurrentUser): ${providers.join(', ')}");
     } on FirebaseAuthException catch (e) {
       // provider-already-linked: Google sudah ter-link → tidak masalah
       // credential-already-in-use: credential Google ini sudah dipakai akun lain
+      if (e.code == 'provider-already-linked') return;
+      rethrow;
+    }
+  }
+
+  /// Link Password credential ke akun yang sedang aktif (sudah sign in).
+  /// Digunakan saat user sudah login Google dan ingin tambah password.
+  Future<void> linkPasswordToCurrentUser({
+    required String email,
+    required String password,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'Tidak ada user yang sedang login.',
+      );
+    }
+    final credential = EmailAuthProvider.credential(email: email, password: password);
+    try {
+      await user.linkWithCredential(credential);
+      final providers = user.providerData.map((p) => p.providerId).toList();
+      debugPrint("ACTIVE PROVIDERS (linkPasswordToCurrentUser): ${providers.join(', ')}");
+    } on FirebaseAuthException catch (e) {
       if (e.code == 'provider-already-linked') return;
       rethrow;
     }

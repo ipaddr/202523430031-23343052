@@ -7,7 +7,6 @@ class SuperAdminSheetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Header modal dipakai ulang untuk beberapa sheet super admin.
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

@@ -26,7 +26,6 @@ class SuperAdminHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Header atas menyatukan salam, notifikasi, dan avatar pengguna.
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Center(
@@ -105,12 +104,8 @@ class _NotificationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Tombol lonceng membaca status notifikasi admin dari Firestore.
     if (currentUser == null) {
-      return CustomNotificationButton(
-        hasNotification: false,
-        onTap: () {},
-      );
+      return CustomNotificationButton(hasNotification: false, onTap: () {});
     }
 
     final FirestoreService firestoreService = FirestoreService();
@@ -118,7 +113,6 @@ class _NotificationButton extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot>(
       stream: firestoreService.getUserStream(currentUser!.uid),
       builder: (context, userSnap) {
-        // Ambil waktu terakhir membuka notifikasi dari dokumen user.
         Timestamp? lastOpened;
         if (userSnap.hasData && userSnap.data!.exists) {
           final userData = userSnap.data!.data() as Map<String, dynamic>;
@@ -133,7 +127,10 @@ class _NotificationButton extends StatelessWidget {
         }
 
         return StreamBuilder<QuerySnapshot>(
-          stream: firestoreService.getPendingAdminsStream(),
+          stream: FirebaseFirestore.instance
+              .collection('notifications')
+              .where('roleTarget', isEqualTo: 'superadmin')
+              .snapshots(),
           builder: (context, snapshot) {
             bool showDot = false;
             if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
@@ -169,11 +166,11 @@ class _NotificationButton extends StatelessWidget {
     );
   }
 
-  Widget _notificationShell({required bool showDot, required VoidCallback onTap}) {
-    return CustomNotificationButton(
-      hasNotification: showDot,
-      onTap: onTap,
-    );
+  Widget _notificationShell({
+    required bool showDot,
+    required VoidCallback onTap,
+  }) {
+    return CustomNotificationButton(hasNotification: showDot, onTap: onTap);
   }
 }
 
@@ -186,15 +183,10 @@ class _SuperAdminAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final FirestoreService firestoreService = FirestoreService();
 
-    // Helper untuk membangun tampilan avatar dengan gradient dan border.
     Widget avatarShell(String? avatarUrl) {
-      return CustomUserAvatar(
-        photoUrl: avatarUrl,
-        size: 52,
-      );
+      return CustomUserAvatar(photoUrl: avatarUrl, size: 52);
     }
 
-    // Jika belum ada user, tampilkan avatar default.
     if (currentUser == null) {
       return avatarShell(null);
     }

@@ -10,7 +10,6 @@ import '../styles/app_colors.dart';
 import '../widgets/background.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
 
-// Halaman untuk mengubah profil pengguna yang sedang login.
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
 
@@ -92,7 +91,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _loadUserData() async {
-    // Muat data profil awal dari dokumen user aktif.
     final user = _authService.getCurrentUser();
     if (user != null) {
       try {
@@ -204,7 +202,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<String> _uploadFile(XFile file) async {
-    // Upload foto profil dilakukan melalui Cloudinary.
     if (CloudinaryConfig.cloudName == 'YOUR_CLOUD_NAME' ||
         CloudinaryConfig.uploadPreset == 'YOUR_UPLOAD_PRESET') {
       throw Exception(
@@ -248,7 +245,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _pickAndUploadImage(ImageSource source) async {
-    // Pilih gambar lalu unggah langsung agar field foto terbarui cepat.
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
@@ -308,7 +304,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   void _showPickerOptions(BuildContext context) {
-    // Bottom sheet ini memberi pilihan galeri atau kamera.
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0F172A),
@@ -355,7 +350,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _saveProfile() async {
-    // Simpan perubahan profil ke Firestore setelah validasi selesai.
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -500,7 +494,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return '';
   }
 
-  // ------------------ Operational hours helpers ------------------
   TimeOfDay _parseTimeOfDay(String input) {
     try {
       final s = input.replaceAll(':', '.').trim();
@@ -650,13 +643,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
       context: context,
       initialTime: initialTime,
       builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            timePickerTheme: const TimePickerThemeData(
-              backgroundColor: Color(0xFF0F172A),
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              timePickerTheme: const TimePickerThemeData(
+                backgroundColor: Color(0xFF0F172A),
+              ),
             ),
+            child: child ?? const SizedBox.shrink(),
           ),
-          child: child ?? const SizedBox.shrink(),
         );
       },
     );
@@ -675,8 +671,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   List<Map<String, dynamic>> _buildOperationalHoursPayload() {
     // Semua hari harus tetap disimpan, termasuk yang tutup.
-    // Saat tutup, Firestore tetap menyimpan jam buka/tutup terakhir
-    // tetapi statusnya ditandai lewat `isOpen: false`.
     return _operationalScheduleItems
         .map(
           (item) => {
@@ -700,7 +694,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final String minute = time.minute.toString().padLeft(2, '0');
     return '$hour.$minute';
   }
-  // ------------------ end operational helpers ------------------
 
   @override
   Widget build(BuildContext context) {
@@ -717,7 +710,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                   child: Center(
@@ -795,7 +787,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                             child: Stack(
                                               children: [
                                                 CustomUserAvatar(
-                                                  photoUrl: _fotoProfilController.text.trim(),
+                                                  photoUrl:
+                                                      _fotoProfilController.text
+                                                          .trim(),
                                                   size: 100,
                                                   hasBorder: true,
                                                 ),
@@ -862,7 +856,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     ),
                                     const SizedBox(height: 32),
 
-                                    // Field Nama
                                     const Text(
                                       'NAMA LENGKAP',
                                       style: TextStyle(
@@ -933,7 +926,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     ),
                                     const SizedBox(height: 20),
 
-                                    // Field No HP
                                     const Text(
                                       'NOMOR HP',
                                       style: TextStyle(
@@ -1026,9 +1018,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                                     const SizedBox(height: 16),
 
-                                    // Tombol Simpan
                                     SizedBox(
-                                      width: double.infinity,
                                       height: 52,
                                       child: ElevatedButton(
                                         onPressed: _isLoading

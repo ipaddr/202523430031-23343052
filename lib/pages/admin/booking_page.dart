@@ -7,6 +7,7 @@ import 'package:gamezone/services/firestore_service.dart';
 import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
+import 'package:gamezone/styles/gradients.dart';
 import 'package:gamezone/widgets/background.dart';
 import 'package:gamezone/widgets/admin/admin_bottom_navbar.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
@@ -48,7 +49,15 @@ class _BookingPageState extends State<BookingPage> {
   @override
   void initState() {
     super.initState();
-    _stationFuture = _loadStationData();
+    _stationFuture = _loadStationData().then((pageData) {
+      if (pageData != null) {
+        final stationId = pageData.station['id']?.toString() ?? '';
+        if (stationId.isNotEmpty) {
+          _firestoreService.completeFinishedBookings(stationId: stationId);
+        }
+      }
+      return pageData;
+    });
   }
 
   @override
@@ -121,7 +130,7 @@ class _BookingPageState extends State<BookingPage> {
     return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match match) => '${match[1]}.')}';
   }
 
-  // Gunakan fungsi kanonik dari status_badge.dart agar konsisten di seluruh app.
+
   Color _getBookingStatusColor(String status) => bookingStatusColor(status);
   String _getBookingStatusLabel(String status) => bookingStatusLabel(status);
 
@@ -198,7 +207,7 @@ class _BookingPageState extends State<BookingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header admin
+
 
         // Pencarian booking
         Padding(
@@ -242,7 +251,7 @@ class _BookingPageState extends State<BookingPage> {
           ),
         ),
 
-        // DAFTAR BOOKING
+
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: _bookingsStream,
@@ -267,7 +276,23 @@ class _BookingPageState extends State<BookingPage> {
                 );
               }
 
-              final docs = snapshot.data?.docs ?? [];
+              final docs = [...(snapshot.data?.docs ?? [])];
+              docs.sort((a, b) {
+                final aData = a.data() as Map<String, dynamic>;
+                final bData = b.data() as Map<String, dynamic>;
+                final dynamic aTime = aData['createdAt'];
+                final dynamic bTime = bData['createdAt'];
+                if (aTime == null && bTime == null) return 0;
+                if (aTime == null) return 1;
+                if (bTime == null) return -1;
+                final DateTime aDate = aTime is Timestamp
+                    ? aTime.toDate()
+                    : (aTime is DateTime ? aTime : DateTime.now());
+                final DateTime bDate = bTime is Timestamp
+                    ? bTime.toDate()
+                    : (bTime is DateTime ? bTime : DateTime.now());
+                return bDate.compareTo(aDate);
+              });
               final filteredDocs = docs.where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
 
@@ -289,9 +314,10 @@ class _BookingPageState extends State<BookingPage> {
                     uName.contains(_searchQuery) ||
                     unitName.contains(_searchQuery);
 
-                final matchesStatus =
-                    _selectedStatus == 'Semua' ||
-                    status == _selectedStatus.toLowerCase();
+                final matchesStatus = _selectedStatus == 'Semua' ||
+                    (status == _selectedStatus.toLowerCase() ||
+                        (_selectedStatus.toLowerCase() == 'pending' &&
+                            status == 'pending_confirmation'));
 
                 final matchesPayment =
                     _selectedPayment == 'Semua' ||
@@ -316,7 +342,7 @@ class _BookingPageState extends State<BookingPage> {
                 );
               }
 
-              // Daftar booking
+      
               return ListView.builder(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 itemCount: filteredDocs.length,
@@ -333,7 +359,7 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  // Informasi booking
+
   Widget _buildBookingCard(BuildContext context, Map<String, dynamic> data) {
     final String bookingId = data['bookingId']?.toString() ?? '-';
     final String namaUser = data['namaUser']?.toString() ?? 'Pelanggan';
@@ -558,15 +584,51 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
+  Widget _buildFilterPill({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final Color borderColor = selected
+        ? AppColors.accentCyan.withValues(alpha: 0.55)
+        : AppColors.white.withValues(alpha: 0.08);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: selected ? Gradients.kAccent : null,
+          color: selected
+              ? null
+              : AppColors.secondaryDark.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+          border: Border.all(color: borderColor, width: 1.1),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyle.caption1.copyWith(
+            color: selected ? AppColors.white : AppColors.softGray,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showFilterBottomSheet(BuildContext context) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      isScrollControlled: true,
+      builder: (BuildContext context) {
         return StatefulBuilder(
-          builder: (context, setSheetState) {
+          builder: (BuildContext context, StateSetter setSheetState) {
+            final double keyboardPadding = MediaQuery.of(context).viewInsets.bottom;
             return Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 24 + keyboardPadding),
               decoration: const BoxDecoration(
                 color: Color(0xFF0F172A),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -574,100 +636,183 @@ class _BookingPageState extends State<BookingPage> {
                   top: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
                 ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(999),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Filter Booking',
-                    style: AppTextStyle.h4.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Status Booking',
-                    style: AppTextStyle.body1.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children:
-                        [
-                          'Semua',
-                          'Pending',
-                          'Confirmed',
-                          'Active',
-                          'Completed',
-                          'Cancelled',
-                          'Rejected',
-                        ].map((status) {
-                          final bool isSelected = _selectedStatus == status;
-                          final String displayLabel = switch (status
-                              .toLowerCase()) {
-                            'pending' => 'Menunggu',
-                            'confirmed' => 'Dikonfirmasi',
-                            'active' => 'Sedang Bermain',
-                            'completed' => 'Selesai',
-                            'cancelled' => 'Dibatalkan',
-                            'rejected' => 'Ditolak',
-                            _ => status,
-                          };
-                          return ChoiceChip(
-                            label: Text(displayLabel),
-                            selected: isSelected,
-                            onSelected: (selected) {
-                              setSheetState(() => _selectedStatus = status);
-                              setState(() => _selectedStatus = status);
-                            },
-                          );
-                        }).toList(),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Status Pembayaran',
-                    style: AppTextStyle.body1.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: ['Semua', 'Paid', 'Unpaid'].map((pay) {
-                      final bool isSelected = _selectedPayment == pay;
-                      return ChoiceChip(
-                        label: Text(
-                          pay == 'Paid'
-                              ? 'Lunas'
-                              : pay == 'Unpaid'
-                              ? 'Belum Lunas'
-                              : 'Semua',
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Filter Booking',
+                          style: AppTextStyle.h4.copyWith(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setSheetState(() => _selectedPayment = pay);
-                          setState(() => _selectedPayment = pay);
-                        },
-                      );
-                    }).toList(),
-                  ),
-                ],
+                        IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: AppColors.softGray,
+                            size: 20,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    Text(
+                      'Status Booking',
+                      style: AppTextStyle.body1.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children:
+                          [
+                            'Semua',
+                            'Pending',
+                            'Confirmed',
+                            'Active',
+                            'Completed',
+                            'Cancelled',
+                            'Rejected',
+                          ].map((status) {
+                            final bool isSelected = _selectedStatus == status;
+                            final String displayLabel = switch (status
+                                .toLowerCase()) {
+                              'pending' => 'Menunggu',
+                              'confirmed' => 'Dikonfirmasi',
+                              'active' => 'Sedang Bermain',
+                              'completed' => 'Selesai',
+                              'cancelled' => 'Dibatalkan',
+                              'rejected' => 'Ditolak',
+                              _ => status,
+                            };
+                            return _buildFilterPill(
+                              label: displayLabel,
+                              selected: isSelected,
+                              onTap: () {
+                                setSheetState(() {
+                                  _selectedStatus = status;
+                                });
+                              },
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+
+                    Text(
+                      'Status Pembayaran',
+                      style: AppTextStyle.body1.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: ['Semua', 'Paid', 'Unpaid'].map((pay) {
+                        final bool isSelected = _selectedPayment == pay;
+                        final String displayLabel = pay == 'Paid'
+                            ? 'Lunas'
+                            : pay == 'Unpaid'
+                            ? 'Belum Lunas'
+                            : 'Semua';
+                        return _buildFilterPill(
+                          label: displayLabel,
+                          selected: isSelected,
+                          onTap: () {
+                            setSheetState(() {
+                              _selectedPayment = pay;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                                side: BorderSide(
+                                  color: AppColors.white.withValues(alpha: 0.12),
+                                ),
+                              ),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _selectedStatus = 'Semua';
+                                _selectedPayment = 'Semua';
+                              });
+                              Navigator.pop(context);
+                            },
+                            child: Text(
+                              'Reset Filter',
+                              style: AppTextStyle.buttonSmall.copyWith(
+                                color: AppColors.softGray,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: Gradients.kAccent,
+                              borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                            ),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {});
+                                Navigator.pop(context);
+                              },
+                              child: Text(
+                                'Terapkan',
+                                style: AppTextStyle.buttonSmall.copyWith(
+                                  color: AppColors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             );
           },

@@ -87,8 +87,6 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
     return _initialUnitData;
   }
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
-
   String _unitName(Map<String, dynamic> d) =>
       d['namaUnit']?.toString() ?? 'Detail Unit';
 
@@ -113,6 +111,11 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
     if (lower == 'digunakan') return AppColors.errorRed;
     if (lower == 'tersedia') return AppColors.successGreen;
     if (lower == 'perawatan') return AppColors.warningOrange;
+    if (lower == 'tidak_aktif' ||
+        lower == 'tidak_tersedia' ||
+        lower == 'inactive') {
+      return AppColors.softGray;
+    }
     return AppColors.softGray;
   }
 
@@ -121,6 +124,11 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
     if (lower == 'digunakan') return 'Digunakan';
     if (lower == 'tersedia') return 'Tersedia';
     if (lower == 'perawatan') return 'Perawatan';
+    if (lower == 'tidak_aktif' ||
+        lower == 'tidak_tersedia' ||
+        lower == 'inactive') {
+      return 'Tidak Tersedia';
+    }
     return status.isEmpty ? 'Unknown' : status;
   }
 
@@ -157,8 +165,6 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
     }
     return values.toList(growable: false);
   }
-
-  // ─── Navigation / Actions ────────────────────────────────────────────────────
 
   Future<void> _openEditUnit(Map<String, dynamic> unitData) async {
     try {
@@ -278,8 +284,6 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
     );
   }
 
-  // ─── Build ───────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -375,7 +379,6 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── Header ──────────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
           child: Row(
@@ -414,17 +417,14 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
           ),
         ),
 
-        // ── Scrollable Content ───────────────────────────────────────────────
         Expanded(
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             children: [
-              // IMAGE SECTION
               _buildImageSection(imageUrl, badge, status, isPc),
               const SizedBox(height: 16),
 
-              // INFO SECTION
               _buildInfoSection(
                 unitData,
                 unitName,
@@ -437,18 +437,14 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
               ),
               const SizedBox(height: 16),
 
-              // DETAIL SECTION
               _buildDetailSection(unitData, isPc, isRoom, kapasitasStr, status),
               const SizedBox(height: 16),
 
-              // FASILITAS SECTION
               _buildFacilitiesSection(facilities, isRoom),
               const SizedBox(height: 16),
 
-              // GAME SECTION
               _buildGamesSection(games),
 
-              // PC SPEC SUMMARY (hanya untuk PC)
               if (isPc) ...[
                 const SizedBox(height: 16),
                 _buildPcSpecSummary(unitData),
@@ -456,7 +452,6 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
 
               const SizedBox(height: 30),
 
-              // ── Action Buttons ─────────────────────────────────────────────
               if (_viewMode == ViewMode.user)
                 _buildUserActions(unitData)
               else
@@ -469,8 +464,6 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
       ],
     );
   }
-
-  // ─── Section Widgets ─────────────────────────────────────────────────────────
 
   Widget _buildSectionCard({required Widget child}) {
     return Container(
@@ -998,26 +991,49 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
     );
   }
 
-  // ─── Action Buttons ──────────────────────────────────────────────────────────
+  // Tombol aksi untuk pemesanan atau pengelolaan unit
 
   /// Tombol aksi untuk USER: Booking Sekarang
   Widget _buildUserActions(Map<String, dynamic> unitData) {
+    final String status = (unitData['status'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final bool canBook = status != 'perawatan' &&
+        status != 'maintenance' &&
+        status != 'tidak_aktif' &&
+        status != 'tidak_tersedia' &&
+        status != 'inactive';
+
+    String buttonText = 'Booking Sekarang';
+    if (status == 'perawatan') {
+      buttonText = 'Unit Sedang Perawatan';
+    } else if (status == 'tidak_aktif' ||
+        status == 'tidak_tersedia' ||
+        status == 'inactive') {
+      buttonText = 'Unit Tidak Tersedia';
+    }
+
     return GestureDetector(
-      onTap: () => _openBooking(unitData),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          gradient: Gradients.kAccent,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: AppTheme.shadowMedium,
-        ),
-        child: Text(
-          'Booking Sekarang',
-          textAlign: TextAlign.center,
-          style: AppTextStyle.buttonMedium.copyWith(
-            color: AppColors.white,
-            fontWeight: FontWeight.bold,
+      onTap: canBook ? () => _openBooking(unitData) : null,
+      child: Opacity(
+        opacity: canBook ? 1.0 : 0.45,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            gradient: canBook ? Gradients.kAccent : null,
+            color: canBook ? null : const Color(0xFF334155),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: canBook ? AppTheme.shadowMedium : null,
+          ),
+          child: Text(
+            buttonText,
+            textAlign: TextAlign.center,
+            style: AppTextStyle.buttonMedium.copyWith(
+              color: canBook ? AppColors.white : AppColors.softGray,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
