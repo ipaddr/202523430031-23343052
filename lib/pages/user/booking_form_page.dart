@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:gamezone/services/auth_service.dart';
@@ -29,6 +31,9 @@ class _BookingFormPageState extends State<BookingFormPage> {
   Map<String, dynamic> _unitData = {};
   Map<String, dynamic>? _stationData;
 
+  // Stream subscription untuk data station realtime
+  StreamSubscription<DocumentSnapshot>? _stationSubscription;
+
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime; // Jam Mulai
   TimeOfDay? _endTime; // Jam Selesai
@@ -42,7 +47,13 @@ class _BookingFormPageState extends State<BookingFormPage> {
     if (_isRouteInitialized) return;
     _isRouteInitialized = true;
     _parseRouteArguments();
-    _fetchStationData();
+    _subscribeStationData();
+  }
+
+  @override
+  void dispose() {
+    _stationSubscription?.cancel();
+    super.dispose();
   }
 
   void _parseRouteArguments() {
@@ -59,26 +70,42 @@ class _BookingFormPageState extends State<BookingFormPage> {
     }
   }
 
-  Future<void> _fetchStationData() async {
+  /// Berlangganan stream realtime data station dari Firestore.
+  /// Setiap kali admin mengubah jam operasional, widget ini otomatis
+  /// menerima data terbaru tanpa perlu fetch ulang secara manual.
+  void _subscribeStationData() {
     if (_stationId.isEmpty) return;
+
     setState(() {
       _loadingStation = true;
     });
-    try {
-      final data = await _firestoreService.getStationData(_stationId);
-      setState(() {
-        _stationData = data;
-      });
-    } catch (e) {
-      debugPrint('Gagal memuat data stasiun: $e');
-    } finally {
-      setState(() {
-        _loadingStation = false;
-      });
-    }
+
+    _stationSubscription = _firestoreService
+        .getStationStream(_stationId)
+        .listen(
+          (snapshot) {
+            if (!mounted) return;
+            final data = snapshot.data() as Map<String, dynamic>?;
+            setState(() {
+              _stationData = data;
+              _loadingStation = false;
+            });
+            // Jalankan ulang validasi jadwal agar error/warning langsung
+            // diperbarui berdasarkan jam operasional terbaru.
+            if (_selectedTime != null || _endTime != null) {
+              _validateSchedule();
+            }
+          },
+          onError: (Object e) {
+            debugPrint('Gagal memuat data stasiun: $e');
+            if (!mounted) return;
+            setState(() {
+              _loadingStation = false;
+            });
+          },
+        );
   }
 
-  // Fungsi bantu untuk memformat tanggal, waktu, dan mata uang
   String _formatDate(DateTime date) {
     final List<String> days = [
       'Senin',

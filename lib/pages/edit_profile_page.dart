@@ -1018,41 +1018,43 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                                     const SizedBox(height: 16),
 
-                                    SizedBox(
-                                      height: 52,
-                                      child: ElevatedButton(
-                                        onPressed: _isLoading
-                                            ? null
-                                            : _saveProfile,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.accentCyan,
-                                          foregroundColor: Colors.black,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              16,
+                                    Center(
+                                      child: SizedBox(
+                                        height: 52,
+                                        child: ElevatedButton(
+                                          onPressed: _isLoading
+                                              ? null
+                                              : _saveProfile,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                AppColors.accentCyan,
+                                            foregroundColor: Colors.black,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
                                             ),
                                           ),
+                                          child: _isLoading
+                                              ? const SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2.5,
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                          Color
+                                                        >(Colors.black),
+                                                  ),
+                                                )
+                                              : const Text(
+                                                  'Simpan Perubahan',
+                                                  style: TextStyle(
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.bold,
+                                                    letterSpacing: 0.5,
+                                                  ),
+                                                ),
                                         ),
-                                        child: _isLoading
-                                            ? const SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2.5,
-                                                  valueColor:
-                                                      AlwaysStoppedAnimation<
-                                                        Color
-                                                      >(Colors.black),
-                                                ),
-                                              )
-                                            : const Text(
-                                                'Simpan Perubahan',
-                                                style: TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.bold,
-                                                  letterSpacing: 0.5,
-                                                ),
-                                              ),
                                       ),
                                     ),
                                   ],

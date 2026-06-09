@@ -95,7 +95,7 @@ class RegistrationService {
       );
 
       await credential.user?.updateDisplayName(name);
-      
+
       // Akun baru — buat dokumen Firestore langsung pada users/{uid}
       await _firestoreService.createUser(credential.user!.uid, {
         'nama': name,
@@ -187,21 +187,29 @@ class RegistrationService {
 
       // Kirim notifikasi admin_registered ke Superadmin
       try {
-        final superadminNotifId = FirebaseFirestore.instance.collection('notifications').doc().id;
-        await FirebaseFirestore.instance.collection('notifications').doc(superadminNotifId).set({
-          'userId': 'superadmin',
-          'targetId': 'superadmin',
-          'roleTarget': 'superadmin',
-          'stationId': uid,
-          'bookingId': '',
-          'type': 'admin_registered',
-          'title': 'Admin Baru Mendaftar',
-          'message': 'Terdapat pendaftaran Game Station baru.',
-          'isRead': false,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        final superadminNotifId = FirebaseFirestore.instance
+            .collection('notifications')
+            .doc()
+            .id;
+        await FirebaseFirestore.instance
+            .collection('notifications')
+            .doc(superadminNotifId)
+            .set({
+              'userId': 'superadmin',
+              'targetId': 'superadmin',
+              'roleTarget': 'superadmin',
+              'stationId': uid,
+              'bookingId': '',
+              'type': 'admin_registered',
+              'title': 'Admin Baru Mendaftar',
+              'message': 'Terdapat pendaftaran Game Station baru.',
+              'isRead': false,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
       } catch (e) {
-        debugPrint('Error sending admin_registered notification to superadmin: $e');
+        debugPrint(
+          'Error sending admin_registered notification to superadmin: $e',
+        );
       }
 
       await _authService.signOut();

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gamezone/firebase_options.dart';
+import 'package:gamezone/services/firestore_service.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/pages/start/splash_page.dart';
 import 'package:gamezone/pages/start/onboarding_page.dart';
@@ -53,8 +56,40 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final FirestoreService _firestoreService = FirestoreService();
+  Timer? _autoCompleteTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Jalankan sekali saat app dibuka, lalu setiap 5 menit.
+    // Ini memastikan booking yang sudah melewati jamSelesai
+    // diselesaikan otomatis tanpa bergantung pada navigasi halaman.
+    _runAutoComplete();
+    _autoCompleteTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => _runAutoComplete(),
+    );
+  }
+
+  void _runAutoComplete() {
+    // Tanpa filter userId/stationId agar semua booking global tercakup.
+    _firestoreService.completeFinishedBookings();
+  }
+
+  @override
+  void dispose() {
+    _autoCompleteTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

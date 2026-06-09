@@ -216,7 +216,8 @@ class FirestoreService {
 
   Future<void> createBooking(Map<String, dynamic> bookingData) async {
     final String unitId = bookingData['unitId']?.toString() ?? '';
-    final String tanggalBooking = bookingData['tanggalBooking']?.toString() ?? '';
+    final String tanggalBooking =
+        bookingData['tanggalBooking']?.toString() ?? '';
     final String jamMulai = bookingData['jamMulai']?.toString() ?? '';
     final String jamSelesai = bookingData['jamSelesai']?.toString() ?? '';
 
@@ -243,7 +244,10 @@ class FirestoreService {
     }
 
     // Cek bentrok jadwal dengan booking lain yang sudah dibayar atau aktif
-    if (unitId.isNotEmpty && tanggalBooking.isNotEmpty && jamMulai.isNotEmpty && jamSelesai.isNotEmpty) {
+    if (unitId.isNotEmpty &&
+        tanggalBooking.isNotEmpty &&
+        jamMulai.isNotEmpty &&
+        jamSelesai.isNotEmpty) {
       final bookingsSnap = await _db
           .collection('bookings')
           .where('unitId', isEqualTo: unitId)
@@ -255,8 +259,12 @@ class FirestoreService {
 
       for (final doc in bookingsSnap.docs) {
         final data = doc.data();
-        final String statusBooking = (data['statusBooking'] ?? '').toString().toLowerCase();
-        final String statusPembayaran = (data['statusPembayaran'] ?? '').toString().toLowerCase();
+        final String statusBooking = (data['statusBooking'] ?? '')
+            .toString()
+            .toLowerCase();
+        final String statusPembayaran = (data['statusPembayaran'] ?? '')
+            .toString()
+            .toLowerCase();
 
         // Abaikan status terminal
         if (statusBooking == 'cancelled' ||
@@ -270,17 +278,24 @@ class FirestoreService {
 
         // Blokir jika booking lain sudah paid atau statusnya aktif (pending_confirmation, confirmed, active, checkin)
         final bool isPaid = statusPembayaran == 'paid';
-        final bool isActiveStatus = statusBooking == 'pending_confirmation' ||
+        final bool isActiveStatus =
+            statusBooking == 'pending_confirmation' ||
             statusBooking == 'confirmed' ||
             statusBooking == 'active' ||
             statusBooking == 'checkin';
 
         if (isPaid || isActiveStatus) {
-          final int existStart = _timeStrToMinutes(data['jamMulai']?.toString() ?? '00:00');
-          final int existEnd = _timeStrToMinutes(data['jamSelesai']?.toString() ?? '00:00');
+          final int existStart = _timeStrToMinutes(
+            data['jamMulai']?.toString() ?? '00:00',
+          );
+          final int existEnd = _timeStrToMinutes(
+            data['jamSelesai']?.toString() ?? '00:00',
+          );
 
           if (newStart < existEnd && newEnd > existStart) {
-            throw Exception('Jadwal tersebut sudah dibooking oleh pengguna lain.');
+            throw Exception(
+              'Jadwal tersebut sudah dibooking oleh pengguna lain.',
+            );
           }
         }
       }
@@ -629,9 +644,13 @@ class FirestoreService {
     }
   }
 
-  /// Membaca semua booking aktif ('active') dan menyelesaikan otomatis jika
+  /// Membaca semua booking yang sedang berjalan dan menyelesaikan otomatis jika
   /// waktu sewa (tanggalBooking + jamSelesai) sudah terlewati.
-  /// Dipanggil di berbagai entry point halaman admin & user.
+  /// Dipanggil di berbagai entry point halaman admin & user, serta oleh timer
+  /// periodik di [MyApp] agar tidak bergantung pada navigasi halaman.
+  ///
+  /// Status yang dicakup: 'confirmed', 'active', 'checkin'
+  /// ('active' dan 'checkin' dipertahankan untuk kompatibilitas masa depan).
   Future<void> completeFinishedBookings({
     String? userId,
     String? stationId,
@@ -639,7 +658,10 @@ class FirestoreService {
     try {
       Query<Map<String, dynamic>> query = _db
           .collection('bookings')
-          .where('statusBooking', whereIn: const ['active', 'checkin']);
+          .where(
+            'statusBooking',
+            whereIn: const ['confirmed', 'active', 'checkin'],
+          );
 
       if (userId != null && userId.isNotEmpty) {
         query = query.where('userId', isEqualTo: userId);
@@ -665,7 +687,10 @@ class FirestoreService {
 
         if (tanggalBooking.isEmpty || jamSelesai.isEmpty) continue;
 
-        final DateTime? endTime = _parseBookingEndTime(tanggalBooking, jamSelesai);
+        final DateTime? endTime = _parseBookingEndTime(
+          tanggalBooking,
+          jamSelesai,
+        );
         if (endTime == null) continue;
 
         if (now.isAfter(endTime) || now.isAtSameMomentAs(endTime)) {

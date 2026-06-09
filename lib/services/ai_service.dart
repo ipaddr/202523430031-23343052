@@ -65,12 +65,10 @@ class AiService {
       },
     };
 
-    
     final String obfuscatedKey = key.length > 8
         ? '${key.substring(0, 5)}...${key.substring(key.length - 3)}'
         : 'INVALID_KEY';
 
-    
     debugPrint('================ GEMINI API REQUEST ================');
     debugPrint('Model: $_model');
     debugPrint('Endpoint: $_baseUrl?key=$obfuscatedKey');
@@ -90,7 +88,6 @@ class AiService {
       // Cetak response body mentah untuk kebutuhan debugging dan perbandingan audit
       debugPrint('GEMINI RAW RESPONSE BODY: ${response.body}');
 
-      
       debugPrint('================ GEMINI API RESPONSE ===============');
       debugPrint('Status Code: ${response.statusCode}');
       debugPrint('Response Body: ${response.body}');

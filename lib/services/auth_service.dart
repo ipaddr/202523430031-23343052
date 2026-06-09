@@ -23,8 +23,12 @@ class AuthService {
   }) async {
     final User? currentUser = _auth.currentUser;
     if (currentUser != null) {
-      final providers = currentUser.providerData.map((p) => p.providerId).toList();
-      debugPrint("ACTIVE PROVIDERS (resolveCurrentUser): ${providers.join(', ')}");
+      final providers = currentUser.providerData
+          .map((p) => p.providerId)
+          .toList();
+      debugPrint(
+        "ACTIVE PROVIDERS (resolveCurrentUser): ${providers.join(', ')}",
+      );
       return currentUser;
     }
 
@@ -34,8 +38,12 @@ class AuthService {
           .firstWhere((user) => user != null)
           .timeout(timeout);
       if (resolved != null) {
-        final providers = resolved.providerData.map((p) => p.providerId).toList();
-        debugPrint("ACTIVE PROVIDERS (resolveCurrentUser resolved): ${providers.join(', ')}");
+        final providers = resolved.providerData
+            .map((p) => p.providerId)
+            .toList();
+        debugPrint(
+          "ACTIVE PROVIDERS (resolveCurrentUser resolved): ${providers.join(', ')}",
+        );
       }
       return resolved;
     } catch (_) {
@@ -53,8 +61,12 @@ class AuthService {
       password: password,
     );
     if (cred.user != null) {
-      final providers = cred.user!.providerData.map((p) => p.providerId).toList();
-      debugPrint("ACTIVE PROVIDERS (signInWithEmailAndPassword): ${providers.join(', ')}");
+      final providers = cred.user!.providerData
+          .map((p) => p.providerId)
+          .toList();
+      debugPrint(
+        "ACTIVE PROVIDERS (signInWithEmailAndPassword): ${providers.join(', ')}",
+      );
     }
     return cred;
   }
@@ -83,8 +95,12 @@ class AuthService {
 
     final cred = await _auth.signInWithCredential(credential);
     if (cred.user != null) {
-      final providers = cred.user!.providerData.map((p) => p.providerId).toList();
-      debugPrint("ACTIVE PROVIDERS (signInWithGoogle): ${providers.join(', ')}");
+      final providers = cred.user!.providerData
+          .map((p) => p.providerId)
+          .toList();
+      debugPrint(
+        "ACTIVE PROVIDERS (signInWithGoogle): ${providers.join(', ')}",
+      );
     }
     return cred;
   }
@@ -115,7 +131,9 @@ class AuthService {
     try {
       await user.linkWithCredential(googleCredential);
       final providers = user.providerData.map((p) => p.providerId).toList();
-      debugPrint("ACTIVE PROVIDERS (linkGoogleToCurrentUser): ${providers.join(', ')}");
+      debugPrint(
+        "ACTIVE PROVIDERS (linkGoogleToCurrentUser): ${providers.join(', ')}",
+      );
     } on FirebaseAuthException catch (e) {
       // provider-already-linked: Google sudah ter-link → tidak masalah
       // credential-already-in-use: credential Google ini sudah dipakai akun lain
@@ -137,11 +155,16 @@ class AuthService {
         message: 'Tidak ada user yang sedang login.',
       );
     }
-    final credential = EmailAuthProvider.credential(email: email, password: password);
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: password,
+    );
     try {
       await user.linkWithCredential(credential);
       final providers = user.providerData.map((p) => p.providerId).toList();
-      debugPrint("ACTIVE PROVIDERS (linkPasswordToCurrentUser): ${providers.join(', ')}");
+      debugPrint(
+        "ACTIVE PROVIDERS (linkPasswordToCurrentUser): ${providers.join(', ')}",
+      );
     } on FirebaseAuthException catch (e) {
       if (e.code == 'provider-already-linked') return;
       rethrow;
