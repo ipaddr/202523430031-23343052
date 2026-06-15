@@ -8,7 +8,10 @@ import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/styles/gradients.dart';
-import 'package:gamezone/widgets/background.dart';
+import 'package:gamezone/widgets/common/background.dart';
+import 'package:gamezone/utils/helpers.dart';
+import 'package:gamezone/widgets/common/page_header.dart';
+
 
 class BookingFormPage extends StatefulWidget {
   const BookingFormPage({super.key});
@@ -97,7 +100,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
             }
           },
           onError: (Object e) {
-            debugPrint('Gagal memuat data stasiun: $e');
+            debugPrint('[BookingForm] Gagal memuat data stasiun: $e');
             if (!mounted) return;
             setState(() {
               _loadingStation = false;
@@ -106,44 +109,11 @@ class _BookingFormPageState extends State<BookingFormPage> {
         );
   }
 
-  String _formatDate(DateTime date) {
-    final List<String> days = [
-      'Senin',
-      'Selasa',
-      'Rabu',
-      'Kamis',
-      'Jumat',
-      'Sabtu',
-      'Minggu',
-    ];
-    final List<String> months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
-    ];
-    return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
-  }
+  String _formatDate(DateTime date) => formatDate(date);
 
-  String _formatDateToDb(DateTime date) {
-    final String day = date.day.toString().padLeft(2, '0');
-    final String month = date.month.toString().padLeft(2, '0');
-    return '${date.year}-$month-$day';
-  }
+  String _formatDateToDb(DateTime date) => formatDateToDb(date);
 
-  String _formatTimeOfDay(TimeOfDay time) {
-    final String hour = time.hour.toString().padLeft(2, '0');
-    final String minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
+  String _formatTimeOfDay(TimeOfDay time) => formatTimeOfDay(time);
 
   int _timeToMinutes(String timeStr) {
     try {
@@ -157,10 +127,8 @@ class _BookingFormPageState extends State<BookingFormPage> {
     }
   }
 
-  String _formatCurrency(int value) {
-    if (value <= 0) return 'Rp 0';
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-  }
+  String _formatCurrency(int value) => formatCurrency(value);
+
 
   double _calculateDurationInHours() {
     if (_selectedTime == null || _endTime == null) return 0.0;
@@ -193,7 +161,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
     return null;
   }
 
-  // Firestore Booking & Conflict Checker
+  // Pengecekan bentrok jadwal booking Firestore
   Future<void> _fetchAndValidateBookings() async {
     if (_selectedDate == null || _selectedTime == null || _endTime == null) {
       return;
@@ -274,7 +242,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
 
       _validateSchedule();
     } catch (e) {
-      debugPrint('Gagal memverifikasi jadwal stasiun: $e');
+      debugPrint('[BookingForm] Gagal memverifikasi jadwal stasiun: $e');
       _existingBookings = [];
       _validateSchedule();
     } finally {
@@ -396,11 +364,11 @@ class _BookingFormPageState extends State<BookingFormPage> {
             colorScheme: const ColorScheme.dark(
               primary: AppColors.accentCyan,
               onPrimary: Colors.black,
-              surface: Color(0xFF0F172A),
+              surface: AppColors.primaryDarkNavy,
               onSurface: Colors.white,
             ),
             dialogTheme: const DialogThemeData(
-              backgroundColor: Color(0xFF0F172A),
+              backgroundColor: AppColors.primaryDarkNavy,
             ),
           ),
           child: child ?? const SizedBox.shrink(),
@@ -455,7 +423,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
         return Theme(
           data: Theme.of(context).copyWith(
             timePickerTheme: const TimePickerThemeData(
-              backgroundColor: Color(0xFF0F172A),
+              backgroundColor: AppColors.primaryDarkNavy,
             ),
           ),
           child: child ?? const SizedBox.shrink(),
@@ -475,7 +443,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
     }
   }
 
-  // Submit Booking
+  // Kirim Booking
   Future<void> _submitBooking() async {
     if (_selectedDate == null ||
         _selectedTime == null ||
@@ -537,7 +505,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
           }
         }
       } catch (e) {
-        debugPrint('Gagal memverifikasi status unit: $e');
+        debugPrint('[BookingForm] Gagal memverifikasi status unit: $e');
       }
     }
 
@@ -653,7 +621,6 @@ class _BookingFormPageState extends State<BookingFormPage> {
     }
   }
 
-  // UI Rendering
   @override
   Widget build(BuildContext context) {
     final int pricePerJam = _unitData['hargaPerJam'] is int
@@ -679,10 +646,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Header
                   _buildHeader(),
-
-                  // Form Area
                   Expanded(
                     child: ListView(
                       physics: const BouncingScrollPhysics(),
@@ -712,7 +676,6 @@ class _BookingFormPageState extends State<BookingFormPage> {
 
                         const SizedBox(height: 24),
 
-                        // Submit Button
                         _buildSubmitButton(),
                         const SizedBox(height: 24),
                       ],
@@ -728,43 +691,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
   }
 
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      child: Row(
-        children: [
-          InkWell(
-            onTap: () => Navigator.pop(context),
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF141B31),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF23304C)),
-              ),
-              child: const Icon(
-                Icons.chevron_left_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Form Booking',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
+    return const PageHeader(title: 'Form Booking');
   }
 
   Widget _buildUnitBriefCard() {
@@ -923,7 +850,7 @@ class _BookingFormPageState extends State<BookingFormPage> {
             ),
           ),
 
-          // Error / Checker Message
+          // Pesan error atau pengecekan ketersediaan
           if (_checkingAvailability || _loadingStation)
             const Padding(
               padding: EdgeInsets.only(top: 16),
@@ -1026,10 +953,10 @@ class _BookingFormPageState extends State<BookingFormPage> {
     int totalHarga,
     double durationHours,
   ) {
-    // Format durasi agar tampil sebagai bilangan bulat atau desimal yang cantik
-    final String durationText = durationHours % 1 == 0
-        ? '${durationHours.toInt()} Jam'
-        : '${durationHours.toStringAsFixed(1)} Jam';
+    final String durationText = formatDurationFromTimes(
+      _formatTimeOfDay(_selectedTime!),
+      _formatTimeOfDay(_endTime!),
+    );
 
     return Container(
       padding: const EdgeInsets.all(AppTheme.paddingL),

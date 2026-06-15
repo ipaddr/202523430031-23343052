@@ -1,12 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import '../services/firestore_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 
-import '../styles/app_colors.dart';
-import '../styles/app_textstyle.dart';
-import '../widgets/background.dart';
+import '../../styles/app_colors.dart';
+import '../../styles/app_textstyle.dart';
+import '../../widgets/common/background.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
+import 'package:gamezone/widgets/common/custom_confirm_dialog.dart';
 
 // Halaman profil untuk melihat data akun aktif dan melakukan logout.
 class ProfilePage extends StatefulWidget {
@@ -48,56 +49,15 @@ class _ProfilePageState extends State<ProfilePage> {
     // Ambil navigator dari page context SEBELUM dialog dibuka.
     final navigator = Navigator.of(context, rootNavigator: true);
 
-    final bool? confirm = await showDialog<bool>(
+    final bool confirm = await showCustomConfirmDialog(
       context: context,
-      builder: (dialogContext) {
-        return Theme(
-          data: ThemeData.dark(),
-          child: AlertDialog(
-            backgroundColor: const Color(0xFF0F172A),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(color: Color(0xFF1E293B)),
-            ),
-            title: const Text(
-              'Keluar Akun',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: const Text(
-              'Apakah Anda yakin ingin keluar dari akun Anda?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text(
-                  'Batal',
-                  style: TextStyle(color: Color(0xFF64748B)),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFEF4444),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text(
-                  'Keluar',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+      title: 'Keluar Akun',
+      content: 'Apakah Anda yakin ingin keluar dari akun Anda?',
+      confirmLabel: 'Keluar',
+      isDestructive: true,
     );
 
-    if (confirm == true) {
+    if (confirm) {
       // Jika dashboard menyediakan callback, delegasikan seluruh proses logout
       // ke dashboard agar ia bisa set _isLoggingOut sebelum signout — mencegah
       // flash rebuild ke tab lain sebelum navigasi ke splash.
@@ -489,7 +449,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       child: Icon(
                         roleIcon,
-                        color: const Color(0xFF0F172A),
+                        color: AppColors.primaryDarkNavy,
                         size: 16,
                       ),
                     ),
@@ -623,12 +583,10 @@ class _ProfilePageState extends State<ProfilePage> {
             ElevatedButton.icon(
               onPressed: () => _showLogoutConfirmationDialog(context),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(
-                  0xFFEF4444,
-                ).withValues(alpha: 0.15),
-                foregroundColor: const Color(0xFFEF4444),
+                backgroundColor: AppColors.errorRed.withValues(alpha: 0.15),
+                foregroundColor: AppColors.errorRed,
                 shadowColor: Colors.transparent,
-                side: const BorderSide(color: Color(0xFFEF4444), width: 1.2),
+                side: const BorderSide(color: AppColors.errorRed, width: 1.2),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),

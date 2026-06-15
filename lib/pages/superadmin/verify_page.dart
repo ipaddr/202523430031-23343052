@@ -6,6 +6,7 @@ import 'package:gamezone/widgets/common/custom_empty_state.dart';
 import 'package:gamezone/widgets/common/custom_search_bar.dart';
 import 'package:gamezone/widgets/common/status_badge.dart';
 import 'users_detail_page.dart';
+import 'package:gamezone/styles/app_colors.dart';
 
 // Halaman daftar verifikasi untuk meninjau pengajuan game station.
 class VerifyPage extends StatefulWidget {
@@ -66,7 +67,7 @@ class _VerifyPageState extends State<VerifyPage> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: Color(0xFFEF4444),
+          backgroundColor: AppColors.errorRed,
           content: Text('Gagal menyetujui stasiun game. Coba lagi.'),
         ),
       );
@@ -87,7 +88,7 @@ class _VerifyPageState extends State<VerifyPage> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: const Color(0xFFEF4444),
+          backgroundColor: AppColors.errorRed,
           content: Row(
             children: [
               const Icon(Icons.cancel_rounded, color: Colors.white),
@@ -108,7 +109,7 @@ class _VerifyPageState extends State<VerifyPage> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: Color(0xFFEF4444),
+          backgroundColor: AppColors.errorRed,
           content: Text('Gagal menolak stasiun game.'),
         ),
       );
@@ -117,7 +118,6 @@ class _VerifyPageState extends State<VerifyPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Konten halaman
     return SafeArea(
       child: Center(
         child: ConstrainedBox(
@@ -235,7 +235,7 @@ class _VerifyPageState extends State<VerifyPage> {
         final filteredDocs = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
 
-          // Search matches
+          // Pencarian yang cocok
           final String name = (data['namaStation'] ?? '')
               .toString()
               .toLowerCase();
@@ -255,7 +255,7 @@ class _VerifyPageState extends State<VerifyPage> {
               email.contains(_searchQuery) ||
               phone.contains(_searchQuery);
 
-          // Status matches based on selected tab
+          // Status yang cocok berdasarkan tab terpilih
           final String status = data['statusVerifikasi'] ?? 'pending';
           bool matchesStatus = true;
           if (_selectedTab == 1) {
@@ -308,7 +308,6 @@ class _VerifyPageState extends State<VerifyPage> {
     String stationId,
     String ownerId,
   ) {
-    // Kartu pengajuan menampilkan ringkasan lalu memberi aksi verifikasi.
     final String stationName = data['namaStation'] ?? 'Nama Tidak Diketahui';
     final String ownerName = data['namaOwner'] ?? 'Owner';
     final List<dynamic> photos = data['foto'] ?? [];
@@ -321,7 +320,7 @@ class _VerifyPageState extends State<VerifyPage> {
       statusColor = const Color(0xFF10B981);
     } else if (status == 'rejected') {
       statusText = 'DITOLAK';
-      statusColor = const Color(0xFFEF4444);
+      statusColor = AppColors.errorRed;
     }
 
     Widget imageWidget = const Icon(
@@ -343,7 +342,7 @@ class _VerifyPageState extends State<VerifyPage> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: AppColors.primaryDarkNavy,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF1E293B), width: 1),
       ),
@@ -427,7 +426,7 @@ class _VerifyPageState extends State<VerifyPage> {
                         _rejectStation(context, stationId, stationName),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2D1622),
-                      foregroundColor: const Color(0xFFEF4444),
+                      foregroundColor: AppColors.errorRed,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                         side: const BorderSide(color: Color(0xFF4C1D2F)),

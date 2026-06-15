@@ -12,7 +12,7 @@ import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/styles/gradients.dart';
-import 'package:gamezone/widgets/background.dart';
+import 'package:gamezone/widgets/common/background.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
 import 'package:gamezone/utils/helpers.dart';
 
@@ -151,7 +151,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
           initialData['id'] = snapshot.id;
         }
       } catch (_) {
-        // Menggunakan data dari route bila fetch edit gagal.
+        // Menggunakan data dari route jika pengambilan edit gagal.
       }
     }
 
@@ -163,7 +163,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
           _jenisStation = station['jenis']?.toString() ?? '';
         }
       } catch (e) {
-        debugPrint('Gagal memuat jenis station: $e');
+        debugPrint('[RoomForm] Gagal memuat jenis station: $e');
       }
     }
 
@@ -351,7 +351,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
     throw Exception('Cloudinary: $errorMsg (Status ${response.statusCode})');
   }
 
-  // Upload foto unit
+  // Unggah foto unit
   Future<void> _pickAndUploadImage(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -632,7 +632,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
     return null;
   }
 
-  // Simpan data
+  // Simpan data unit
   Future<void> _saveUnit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -806,7 +806,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
       ]);
     }
 
-    // Jika nilai dari DB tidak ada di opsi standar, masukkan sebagai opsi kustom agar tidak error assertion.
+    // Jika nilai dari DB tidak ada di opsi standar, masukkan sebagai opsi kustom agar tidak terjadi kesalahan asersi.
     if (_selectedJenisRoom != null &&
         _selectedJenisRoom!.isNotEmpty &&
         !options.contains(_selectedJenisRoom)) {
@@ -947,7 +947,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
     );
   }
 
-  // Upload foto
+  // Unggah foto
   Widget _buildPhotoSection() {
     return _buildSectionCard(
       child: Column(

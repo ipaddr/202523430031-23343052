@@ -8,12 +8,15 @@ import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/styles/gradients.dart';
-import 'package:gamezone/widgets/background.dart';
+import 'package:gamezone/widgets/common/background.dart';
 import 'package:gamezone/widgets/admin/admin_bottom_navbar.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
 import 'package:gamezone/widgets/common/custom_empty_state.dart';
 import 'package:gamezone/widgets/common/custom_search_bar.dart';
 import 'package:gamezone/widgets/common/status_badge.dart';
+import 'package:gamezone/utils/helpers.dart';
+import 'package:gamezone/widgets/common/filter_pill.dart';
+
 
 class BookingPage extends StatefulWidget {
   final bool isNestedTab;
@@ -125,10 +128,7 @@ class _BookingPageState extends State<BookingPage> {
     }
   }
 
-  String _formatCurrency(int value) {
-    if (value <= 0) return 'Rp 0';
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match match) => '${match[1]}.')}';
-  }
+  String _formatCurrency(int value) => formatCurrency(value);
 
 
   Color _getBookingStatusColor(String status) => bookingStatusColor(status);
@@ -584,40 +584,6 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  Widget _buildFilterPill({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final Color borderColor = selected
-        ? AppColors.accentCyan.withValues(alpha: 0.55)
-        : AppColors.white.withValues(alpha: 0.08);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: selected ? Gradients.kAccent : null,
-          color: selected
-              ? null
-              : AppColors.secondaryDark.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-          border: Border.all(color: borderColor, width: 1.1),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyle.caption1.copyWith(
-            color: selected ? AppColors.white : AppColors.softGray,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showFilterBottomSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -630,7 +596,7 @@ class _BookingPageState extends State<BookingPage> {
             return Container(
               padding: EdgeInsets.fromLTRB(20, 16, 20, 24 + keyboardPadding),
               decoration: const BoxDecoration(
-                color: Color(0xFF0F172A),
+                color: AppColors.primaryDarkNavy,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                 border: Border(
                   top: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
@@ -706,7 +672,7 @@ class _BookingPageState extends State<BookingPage> {
                               'rejected' => 'Ditolak',
                               _ => status,
                             };
-                            return _buildFilterPill(
+                            return FilterPill(
                               label: displayLabel,
                               selected: isSelected,
                               onTap: () {
@@ -737,7 +703,7 @@ class _BookingPageState extends State<BookingPage> {
                             : pay == 'Unpaid'
                             ? 'Belum Lunas'
                             : 'Semua';
-                        return _buildFilterPill(
+                        return FilterPill(
                           label: displayLabel,
                           selected: isSelected,
                           onTap: () {

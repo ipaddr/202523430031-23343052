@@ -208,7 +208,7 @@ class RegistrationService {
             });
       } catch (e) {
         debugPrint(
-          'Error sending admin_registered notification to superadmin: $e',
+          '[Registration] Gagal mengirim notifikasi admin_registered ke superadmin: $e',
         );
       }
 
@@ -230,7 +230,7 @@ class RegistrationService {
     try {
       await user.delete();
     } catch (e) {
-      debugPrint('Gagal menghapus user setelah registrasi gagal: $e');
+      debugPrint('[Registration] Gagal menghapus user setelah registrasi gagal: $e');
     }
   }
 }

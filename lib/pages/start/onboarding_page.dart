@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../widgets/background.dart';
-import '../../widgets/startup_widgets.dart';
+import '../../widgets/common/background.dart';
+import '../../widgets/common/startup_widgets.dart';
 import '../../styles/app_textstyle.dart';
 
 class OnboardingPage extends StatefulWidget {

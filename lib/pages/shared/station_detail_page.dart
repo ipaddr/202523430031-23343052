@@ -6,8 +6,11 @@ import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/styles/gradients.dart';
-import 'package:gamezone/widgets/background.dart';
+import 'package:gamezone/widgets/common/background.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
+import 'package:gamezone/utils/helpers.dart';
+import 'package:gamezone/widgets/common/page_header.dart';
+
 
 // Menentukan konteks tampilan halaman: user hanya bisa lihat, admin bisa kelola.
 enum ViewMode { user, admin }
@@ -28,7 +31,8 @@ class _StationDetailPageState extends State<StationDetailPage> {
   String _stationId = '';
   Map<String, dynamic>? _initialStationData;
   ViewMode _viewMode = ViewMode.user;
-  late Future<_StationDetailData> _dataFuture;
+  late Stream<DocumentSnapshot> _stationStream;
+  late Stream<QuerySnapshot> _unitsStream;
 
   @override
   void didChangeDependencies() {
@@ -49,7 +53,8 @@ class _StationDetailPageState extends State<StationDetailPage> {
         _stationId = _initialStationData?['id']?.toString() ?? '';
       }
     }
-    _dataFuture = _loadData();
+    _stationStream = _firestoreService.getStationStream(_stationId);
+    _unitsStream = _firestoreService.getUnitsStreamByStation(_stationId);
   }
 
   Map<String, dynamic>? _toStringKeyMap(Object? value) {
@@ -58,49 +63,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
       return value.map((k, dynamic v) => MapEntry(k.toString(), v));
     }
     return null;
-  }
-
-  Future<_StationDetailData> _loadData() async {
-    Map<String, dynamic>? station = _initialStationData;
-
-    // Selalu gunakan _stationId (doc.id dari Firestore) sebagai sid utama.
-    // Jangan bergantung pada station['id'] hasil fetch karena bisa berbeda.
-    final String sid = _stationId.isNotEmpty
-        ? _stationId
-        : _initialStationData?['id']?.toString() ?? '';
-
-    if (sid.isNotEmpty) {
-      try {
-        final fetched = await _firestoreService.getStationData(sid);
-        if (fetched != null) {
-          station = Map<String, dynamic>.from(fetched);
-          station['id'] = sid;
-        }
-      } catch (_) {}
-    }
-    station ??= _initialStationData ?? {};
-    // Pastikan id selalu tersimpan di map station
-    if (station['id'] == null || station['id'].toString().isEmpty) {
-      station['id'] = sid;
-    }
-
-    List<Map<String, dynamic>> units = [];
-    if (sid.isNotEmpty) {
-      try {
-        final snap = await _firestoreService.getUnitsOnceByStation(sid);
-        units = snap.docs.map((d) {
-          final data = Map<String, dynamic>.from(d.data() as Map);
-          data['id'] = d.id;
-          return data;
-        }).toList();
-        units.sort((a, b) {
-          final String an = a['namaUnit']?.toString().toLowerCase() ?? '';
-          final String bn = b['namaUnit']?.toString().toLowerCase() ?? '';
-          return an.compareTo(bn);
-        });
-      } catch (_) {}
-    }
-    return _StationDetailData(station: station, units: units);
   }
 
   String _stationName(Map<String, dynamic> d) =>
@@ -135,8 +97,27 @@ class _StationDetailPageState extends State<StationDetailPage> {
       hours = jam.values.toList();
     }
 
+    final List<String> daysEngToInd = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
+    final String dayName = daysEngToInd[DateTime.now().weekday - 1];
+
     for (final entry in hours) {
       if (entry is! Map) continue;
+      final String? hari = entry['hari']?.toString();
+      if (hari == null || hari.toLowerCase() != dayName.toLowerCase()) {
+        continue;
+      }
+
+      final bool isOpen = entry['isOpen'] as bool? ?? true;
+      if (!isOpen) return false;
+
       final String? buka = entry['buka']?.toString();
       final String? tutup = entry['tutup']?.toString();
       if (buka == null || tutup == null) continue;
@@ -149,7 +130,8 @@ class _StationDetailPageState extends State<StationDetailPage> {
   }
 
   int? _parseTimeToMinutes(String time) {
-    final parts = time.split(':');
+    final cleanTime = time.replaceAll('.', ':');
+    final parts = cleanTime.split(':');
     if (parts.length < 2) return null;
     final h = int.tryParse(parts[0]);
     final m = int.tryParse(parts[1]);
@@ -157,26 +139,12 @@ class _StationDetailPageState extends State<StationDetailPage> {
     return h * 60 + m;
   }
 
-  String _formatCurrency(int value) {
-    if (value <= 0) return '-';
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-  }
+  String _formatCurrency(int value) => formatCurrencyWithDash(value);
 
-  Color _statusColor(String status) {
-    final lower = status.trim().toLowerCase();
-    if (lower == 'digunakan') return AppColors.errorRed;
-    if (lower == 'tersedia') return AppColors.successGreen;
-    if (lower == 'perawatan') return AppColors.warningOrange;
-    return AppColors.softGray;
-  }
+  Color _statusColor(String status) => unitStatusColor(status);
 
-  String _statusLabel(String status) {
-    final lower = status.trim().toLowerCase();
-    if (lower == 'digunakan') return 'Digunakan';
-    if (lower == 'tersedia') return 'Tersedia';
-    if (lower == 'perawatan') return 'Perawatan';
-    return status.isEmpty ? 'Unknown' : status;
-  }
+  String _statusLabel(String status) => unitStatusLabel(status);
+
 
   String _unitType(Map<String, dynamic> d) => d['jenisUnit']?.toString() ?? '';
 
@@ -212,7 +180,7 @@ class _StationDetailPageState extends State<StationDetailPage> {
       context,
       '/admin-room-form',
       arguments: {'mode': 'create', 'stationId': _stationId},
-    ).then((_) => setState(() => _dataFuture = _loadData()));
+    );
   }
 
   void _openEditStation() {
@@ -232,24 +200,55 @@ class _StationDetailPageState extends State<StationDetailPage> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 430),
-              child: FutureBuilder<_StationDetailData>(
-                future: _dataFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: _stationStream,
+                builder: (context, stationSnapshot) {
+                  if (stationSnapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
                       child: CircularProgressIndicator(
                         color: AppColors.accentCyan,
                       ),
                     );
                   }
-                  if (snapshot.hasError) {
+                  if (stationSnapshot.hasError) {
                     return _buildErrorView('Gagal memuat detail station.');
                   }
-                  final data = snapshot.data;
-                  if (data == null) {
+                  final stationDoc = stationSnapshot.data;
+                  if (stationDoc == null || !stationDoc.exists) {
                     return _buildErrorView('Data station tidak ditemukan.');
                   }
-                  return _buildBody(data);
+                  final stationMap = Map<String, dynamic>.from(stationDoc.data() as Map);
+                  stationMap['id'] = stationDoc.id;
+
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: _unitsStream,
+                    builder: (context, unitsSnapshot) {
+                      if (unitsSnapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.accentCyan,
+                          ),
+                        );
+                      }
+                      if (unitsSnapshot.hasError) {
+                        return _buildErrorView('Gagal memuat daftar room.');
+                      }
+                      final unitDocs = unitsSnapshot.data?.docs ?? [];
+                      final unitsList = unitDocs.map((d) {
+                        final data = Map<String, dynamic>.from(d.data() as Map);
+                        data['id'] = d.id;
+                        return data;
+                      }).toList();
+                      unitsList.sort((a, b) {
+                        final String an = a['namaUnit']?.toString().toLowerCase() ?? '';
+                        final String bn = b['namaUnit']?.toString().toLowerCase() ?? '';
+                        return an.compareTo(bn);
+                      });
+
+                      final combinedData = _StationDetailData(station: stationMap, units: unitsList);
+                      return _buildBody(combinedData);
+                    },
+                  );
                 },
               ),
             ),
@@ -304,42 +303,10 @@ class _StationDetailPageState extends State<StationDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-          child: Row(
-            children: [
-              InkWell(
-                onTap: () => Navigator.pop(context),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141B31),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF23304C)),
-                  ),
-                  child: const Icon(
-                    Icons.chevron_left_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Detail Station',
-                  style: AppTextStyle.h4.copyWith(
-                    color: AppColors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (_viewMode == ViewMode.admin)
-                InkWell(
+        PageHeader(
+          title: 'Detail Station',
+          trailing: _viewMode == ViewMode.admin
+              ? InkWell(
                   onTap: _openEditStation,
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
@@ -358,9 +325,8 @@ class _StationDetailPageState extends State<StationDetailPage> {
                       size: 18,
                     ),
                   ),
-                ),
-            ],
-          ),
+                )
+              : null,
         ),
 
         Expanded(
@@ -382,7 +348,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
               _buildUnitsSection(units),
               const SizedBox(height: 16),
 
-              // Rating & Review Section
               _buildReviewsSection(
                 station['id']?.toString() ?? '',
                 rating,
@@ -629,6 +594,7 @@ class _StationDetailPageState extends State<StationDetailPage> {
               final String hari = h['hari']?.toString() ?? '-';
               final String buka = h['buka']?.toString() ?? '-';
               final String tutup = h['tutup']?.toString() ?? '-';
+              final bool isOpen = h['isOpen'] as bool? ?? true;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
@@ -658,9 +624,9 @@ class _StationDetailPageState extends State<StationDetailPage> {
                       ),
                     ),
                     Text(
-                      '$buka – $tutup',
+                      isOpen ? '$buka – $tutup' : 'TUTUP',
                       style: AppTextStyle.body3.copyWith(
-                        color: AppColors.white,
+                        color: isOpen ? AppColors.white : AppColors.errorRed,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1052,7 +1018,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
                           hasBorder: false,
                         ),
                         const SizedBox(width: 12),
-                        // Konten Review
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1082,7 +1047,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
                                 ],
                               ),
                               const SizedBox(height: 4),
-                              // Baris Bintang
                               Row(
                                 children: List.generate(5, (starIdx) {
                                   return Icon(
@@ -1095,7 +1059,6 @@ class _StationDetailPageState extends State<StationDetailPage> {
                                 }),
                               ),
                               const SizedBox(height: 6),
-                              // Komentar
                               Text(
                                 comment,
                                 style: AppTextStyle.body3.copyWith(

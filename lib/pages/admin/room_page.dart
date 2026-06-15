@@ -8,16 +8,18 @@ import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/styles/gradients.dart';
-import 'package:gamezone/widgets/background.dart';
+import 'package:gamezone/widgets/common/background.dart';
 import 'package:gamezone/widgets/admin/admin_bottom_navbar.dart';
 import 'package:gamezone/widgets/admin/admin_header.dart';
 import 'package:gamezone/widgets/admin/unit_card.dart';
 import 'package:gamezone/utils/helpers.dart';
 import 'package:gamezone/widgets/common/custom_empty_state.dart';
 import 'package:gamezone/widgets/common/custom_search_bar.dart';
-// util widget digunakan di widget yang diekstrak
+import 'package:gamezone/widgets/common/filter_pill.dart';
+import 'package:gamezone/widgets/common/custom_confirm_dialog.dart';
+// Widget utilitas digunakan di widget yang diekstrak
 
-/// Halaman pengelolaan unit milik station aktif admin.
+/// Halaman pengelolaan unit milik stasiun aktif admin.
 class RoomPage extends StatefulWidget {
   final bool isNestedTab;
   final User? initialCurrentUser;
@@ -224,55 +226,15 @@ class _RoomPageState extends State<RoomPage> {
     // Ambil ScaffoldMessenger lebih awal agar tidak menggunakan BuildContext lintas async.
     final messenger = ScaffoldMessenger.of(context);
 
-    final bool? confirmed = await showDialog<bool>(
+    final bool confirmed = await showCustomConfirmDialog(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.primaryDarkNavy,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.radiusXL),
-            side: BorderSide(
-              color: AppColors.accentCyan.withValues(alpha: 0.12),
-            ),
-          ),
-          title: Text(
-            'Hapus Unit',
-            style: AppTextStyle.h4.copyWith(
-              color: AppColors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(
-            'Unit "$unitName" akan dihapus permanen. Lanjutkan?',
-            style: AppTextStyle.body3.copyWith(color: AppColors.softGray),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(
-                'Batal',
-                style: AppTextStyle.buttonSmall.copyWith(
-                  color: AppColors.softGray,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.errorRed,
-                foregroundColor: AppColors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-                ),
-              ),
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Hapus'),
-            ),
-          ],
-        );
-      },
+      title: 'Hapus Unit',
+      content: 'Unit "$unitName" akan dihapus permanen. Lanjutkan?',
+      confirmLabel: 'Hapus',
+      isDestructive: true,
     );
 
-    if (confirmed != true) {
+    if (!confirmed) {
       return;
     }
 
@@ -351,7 +313,7 @@ class _RoomPageState extends State<RoomPage> {
         return Container(
           height: MediaQuery.of(sheetContext).size.height * 0.75,
           decoration: const BoxDecoration(
-            color: Color(0xFF0F172A),
+            color: AppColors.primaryDarkNavy,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             border: Border(
               top: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
@@ -896,7 +858,7 @@ class _RoomPageState extends State<RoomPage> {
           ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            // Menggunakan stream yang sudah diinisialisasi
+            // Menggunakan aliran data (stream) yang sudah diinisialisasi
             stream: _unitsStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1021,8 +983,8 @@ class _RoomPageState extends State<RoomPage> {
         }
 
         final String stationId = pageData.station['id']?.toString() ?? '';
-        // Memuat stream unit berdasarkan station aktif
-        // Memperbarui stream ketika station berubah
+        // Memuat stream unit berdasarkan stasiun aktif
+        // Memperbarui stream ketika stasiun berubah
         if (_unitsStream == null || _cachedStationId != stationId) {
           _cachedStationId = stationId;
           _unitsStream = _firestoreService.getUnitsStreamByStation(stationId);
@@ -1052,7 +1014,7 @@ class _RoomPageState extends State<RoomPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(child: mainContent),
-              // Bottom navigation admin (Hanya muncul jika keyboard tidak aktif).
+              // Navigasi bawah admin (Hanya muncul jika keyboard tidak aktif).
               if (MediaQuery.of(context).viewInsets.bottom == 0)
                 AdminBottomNavBar(
                   currentIndex: 1,
@@ -1114,7 +1076,7 @@ class _RoomPageState extends State<RoomPage> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (BuildContext context) {
-        // Gunakan StatefulBuilder agar pilihan interaktif secara langsung di dalam bottom sheet
+        // Gunakan StatefulBuilder agar pilihan interaktif secara langsung di dalam lembar bawah
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setSheetState) {
             final double keyboardPadding = MediaQuery.of(
@@ -1123,7 +1085,7 @@ class _RoomPageState extends State<RoomPage> {
             return Container(
               padding: EdgeInsets.fromLTRB(20, 16, 20, 24 + keyboardPadding),
               decoration: const BoxDecoration(
-                color: Color(0xFF0F172A),
+                color: AppColors.primaryDarkNavy,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                 border: Border(
                   top: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
@@ -1178,7 +1140,7 @@ class _RoomPageState extends State<RoomPage> {
                     Theme(
                       data: Theme.of(
                         context,
-                      ).copyWith(canvasColor: const Color(0xFF0F172A)),
+                      ).copyWith(canvasColor: AppColors.primaryDarkNavy),
                       child: DropdownButtonFormField<String>(
                         initialValue: _selectedSort,
                         style: AppTextStyle.body2.copyWith(
@@ -1256,7 +1218,7 @@ class _RoomPageState extends State<RoomPage> {
                         String type,
                       ) {
                         final bool isSelected = _selectedType == type;
-                        return _buildFilterPill(
+                        return FilterPill(
                           label: type,
                           selected: isSelected,
                           onTap: () {
@@ -1294,7 +1256,7 @@ class _RoomPageState extends State<RoomPage> {
                                 : status;
                             final bool isSelected =
                                 _selectedStatus == displayStatus;
-                            return _buildFilterPill(
+                            return FilterPill(
                               label: status,
                               selected: isSelected,
                               onTap: () {
@@ -1332,7 +1294,7 @@ class _RoomPageState extends State<RoomPage> {
                               ].map((String roomType) {
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8),
-                                  child: _buildFilterPill(
+                                  child: FilterPill(
                                     label: roomType,
                                     selected: _selectedJenisRoom == roomType,
                                     onTap: () {
@@ -1428,40 +1390,6 @@ class _RoomPageState extends State<RoomPage> {
           },
         );
       },
-    );
-  }
-
-  Widget _buildFilterPill({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final Color borderColor = selected
-        ? AppColors.accentCyan.withValues(alpha: 0.55)
-        : AppColors.white.withValues(alpha: 0.08);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: selected ? Gradients.kAccent : null,
-          color: selected
-              ? null
-              : AppColors.secondaryDark.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-          border: Border.all(color: borderColor, width: 1.1),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyle.caption1.copyWith(
-            color: selected ? AppColors.white : AppColors.softGray,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
     );
   }
 

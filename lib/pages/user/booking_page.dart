@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:gamezone/services/firestore_service.dart';
 import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
-import 'package:gamezone/styles/app_theme.dart';
-import 'package:gamezone/styles/gradients.dart';
 import 'package:gamezone/widgets/common/custom_empty_state.dart';
 import 'package:gamezone/widgets/common/custom_search_bar.dart';
+import 'package:gamezone/widgets/common/filter_pill.dart';
 
 class BookingPage extends StatefulWidget {
   const BookingPage({super.key});
@@ -158,7 +157,7 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  // Widget Search Bar
+  // Widget kolom pencarian
   Widget _buildSearchBar() {
     return CustomSearchBar(
       controller: _searchController,
@@ -171,7 +170,7 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  // Widget Tab Filter
+  // Widget filter tab
   Widget _buildTabFilter() {
     return SizedBox(
       height: 38,
@@ -185,7 +184,7 @@ class _BookingPageState extends State<BookingPage> {
 
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: _buildFilterPill(
+            child: FilterPill(
               label: tabLabel,
               selected: selected,
               onTap: () {
@@ -196,40 +195,6 @@ class _BookingPageState extends State<BookingPage> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildFilterPill({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final Color borderColor = selected
-        ? AppColors.accentCyan.withValues(alpha: 0.55)
-        : const Color(0xFF334155).withValues(alpha: 0.5);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: selected ? Gradients.kAccent : null,
-          color: selected
-              ? null
-              : const Color(0xFF1E293B).withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-          border: Border.all(color: borderColor, width: 1.1),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyle.caption1.copyWith(
-            color: selected ? AppColors.white : const Color(0xFF94A3B8),
-            fontWeight: FontWeight.w700,
-          ),
-        ),
       ),
     );
   }
@@ -423,7 +388,7 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  // Widget State Kosong & Error
+  // Widget tampilan kosong & error
   Widget _buildEmptyState({
     required String title,
     required String description,

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -13,8 +14,8 @@ import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/widgets/common/custom_empty_state.dart';
 import 'package:gamezone/widgets/common/custom_notification_button.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
-import '../../widgets/background.dart';
-import '../profile_page.dart';
+import '../../widgets/common/background.dart';
+import '../shared/profile_page.dart';
 import 'ai_page.dart';
 import 'booking_page.dart';
 import 'booking_history_page.dart';
@@ -46,19 +47,13 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   @override
   void initState() {
     super.initState();
-    // Inisialisasi sekali — Future ini tidak akan di-recreate selama widget hidup.
+    // Inisialisasi sekali — Future ini tidak akan dibuat ulang selama widget hidup.
     _newsFuture = _newsService.getLatestGamingNews();
     final currentUser = _authService.getCurrentUser();
     if (currentUser != null) {
       _userStream = _firestoreService.getUserStream(currentUser.uid);
       _firestoreService.completeFinishedBookings(userId: currentUser.uid);
     }
-    debugPrint('================ GNEWS FUTURE INIT ================');
-    debugPrint('GNEWS_API_KEY Dimuat: Ya');
-    debugPrint(
-      'Future dibuat di initState — tidak akan di-recreate saat rebuild.',
-    );
-    debugPrint('====================================================');
   }
 
   @override
@@ -81,7 +76,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   }
 
   /// Logout yang diinisiasi dari tab profil.
-  /// Set _isLoggingOut = true SEBELUM signout agar build() tidak trigger
+  /// Atur _isLoggingOut = true SEBELUM signout agar build() tidak memicu
   /// navigasi ganda saat currentUser menjadi null.
   Future<void> _handleLogout() async {
     setState(() => _isLoggingOut = true);
@@ -209,7 +204,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       children: [
-        // Hero Banner Berita Game Carousel
+        // Banner berita game utama
         FutureBuilder<List<NewsModel>>(
           future: _newsFuture,
           builder: (context, snapshot) {
@@ -294,7 +289,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             ),
           ),
           const SizedBox(width: 12),
-          // Tombol Notifikasi — stream Firestore, dot indicator seperti Admin
+          // Tombol Notifikasi — stream Firestore, indikator titik seperti Admin
           _UserNotificationButton(
             currentUser: currentUser,
             onPressed: () {
@@ -315,7 +310,9 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         : 'Ikuti perkembangan dunia game, esports, dan teknologi gaming terbaru.';
     final String? imageUrl = news.image.isNotEmpty ? news.image : null;
 
-    debugPrint('GNews banner — imageUrl: ${imageUrl ?? "null (no image)"}');
+    if (kDebugMode) {
+      debugPrint('[UserDashboard] GNews banner imageUrl: ${imageUrl ?? "null (no image)"}');
+    }
 
     return GestureDetector(
       onTap: () async {
@@ -335,8 +332,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
           );
         }
       },
-      // Container luar: menentukan ukuran card (160px) + gradient background.
-      // Gradient ini juga berfungsi sebagai fallback saat gambar belum/gagal muat.
+      // Container luar: menentukan ukuran kartu (160px) + latar belakang gradien.
+      // Gradien ini juga berfungsi sebagai cadangan saat gambar belum/gagal dimuat.
       child: Container(
         width: double.infinity,
         height: 160,
@@ -355,16 +352,16 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
             ),
           ],
         ),
-        // ClipRRect memotong konten agar tidak keluar dari radius card.
+        // ClipRRect memotong konten agar tidak keluar dari radius kartu.
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: Stack(
             children: [
               // Layer 1: Gambar GNews
-              // non-Positioned di Stack → Stack pakai ukuran dari SizedBox ini.
-              // Kalau imageUrl null atau gambar gagal load, layer ini tidak
-              // menambah visual apapun — gradient Container parent tetap terlihat
-              // sebagai fallback yang sudah cukup menarik.
+              // non-Positioned di Stack → Stack menggunakan ukuran dari SizedBox ini.
+              // Jika imageUrl null atau gambar gagal dimuat, lapisan ini tidak
+              // menambah visual apa pun — gradien Container induk tetap terlihat
+              // sebagai cadangan yang sudah cukup menarik.
               if (imageUrl != null)
                 SizedBox(
                   width: double.infinity,
@@ -378,8 +375,8 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
                       return const SizedBox.shrink();
                     },
                     errorBuilder: (context, error, stack) {
-                      debugPrint('GNews image blocked/error: $imageUrl');
-                      // Fallback: jangan kosong — tampilkan dekorasi
+                      debugPrint('[UserDashboard] GNews image blocked/error: $imageUrl');
+                      // Cadangan: jangan kosong — tampilkan dekorasi
                       return Container(
                         width: double.infinity,
                         height: 160,
@@ -908,7 +905,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+          colors: [Color(0xFF1E293B), AppColors.primaryDarkNavy],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -935,7 +932,7 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
         return Container(
           height: MediaQuery.of(sheetContext).size.height * 0.75,
           decoration: const BoxDecoration(
-            color: Color(0xFF0F172A),
+            color: AppColors.primaryDarkNavy,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             border: Border(
               top: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
@@ -1219,11 +1216,11 @@ class _UserDashboardPageState extends State<UserDashboardPage> {
   }
 }
 
-// Tombol Notifikasi User
+// Tombol Notifikasi Pengguna
 
 // • Stream getUserStream → ambil lastOpenedNotifications
-// • Stream getUserBookingNotificationsStream → hitung notif belum dibaca
-// • Tampilkan dot indicator jika ada; simpan timestamp saat dibuka
+// • Stream getUserBookingNotificationsStream → hitung notifikasi belum dibaca
+// • Tampilkan indikator titik jika ada; simpan stempel waktu saat dibuka
 class _UserNotificationButton extends StatefulWidget {
   final User? currentUser;
   final VoidCallback onPressed;

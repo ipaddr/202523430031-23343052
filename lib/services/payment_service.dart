@@ -48,7 +48,7 @@ class PaymentService {
         userId = data['userId']?.toString() ?? '';
       }
     } catch (e) {
-      debugPrint('PaymentService: Gagal mengambil data booking awal — $e');
+      debugPrint('[Payment] Gagal mengambil data booking awal: $e');
     }
 
     // Langkah 1: Update status pembayaran booking & totalPemasukan stasiun secara atomik
@@ -67,8 +67,8 @@ class PaymentService {
 
         if (stationId.isNotEmpty) {
           final DocumentReference stationRef = _firestore
-              .collection('stations')
-              .doc(stationId);
+               .collection('stations')
+               .doc(stationId);
           transaction.update(stationRef, {
             'totalPemasukan': FieldValue.increment(totalHarga),
           });
@@ -113,10 +113,11 @@ class PaymentService {
         }
       });
 
-      debugPrint(
-        'PaymentService: booking $bookingId berhasil dibayar via $metodePembayaran. '
-        'totalPemasukan stasiun $stationId bertambah Rp $totalHarga.',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '[Payment] Booking $bookingId berhasil dibayar via $metodePembayaran',
+        );
+      }
     } catch (e) {
       throw Exception('Gagal memproses pembayaran: $e');
     }
@@ -135,7 +136,7 @@ class PaymentService {
     } catch (e) {
       // Pembayaran sudah berhasil — conflict check gagal tidak perlu crash UI
       debugPrint(
-        'PaymentService: conflict check gagal setelah pembayaran — $e',
+        '[Payment] Conflict check gagal setelah pembayaran: $e',
       );
     }
   }
@@ -149,9 +150,11 @@ class PaymentService {
         'statusBooking': 'cancelled',
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      debugPrint('PaymentService: booking $bookingId expired dan dibatalkan.');
+      if (kDebugMode) {
+        debugPrint('[Payment] Booking $bookingId expired dan dibatalkan');
+      }
     } catch (e) {
-      debugPrint('PaymentService: gagal expire booking $bookingId — $e');
+      debugPrint('[Payment] Gagal expire booking $bookingId: $e');
     }
   }
 }

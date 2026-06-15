@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gamezone/services/auth_service.dart';
 import 'package:gamezone/services/firestore_service.dart';
 import 'package:gamezone/styles/app_colors.dart';
@@ -9,6 +8,8 @@ import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/widgets/common/status_badge.dart';
 import 'package:gamezone/widgets/common/action_button.dart';
 import 'package:gamezone/widgets/common/custom_empty_state.dart';
+import 'package:gamezone/utils/helpers.dart';
+
 
 class BookingHistoryPage extends StatefulWidget {
   const BookingHistoryPage({super.key});
@@ -36,41 +37,13 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
     }
   }
 
-  String _formatDate(String dbDateStr) {
-    try {
-      final parts = dbDateStr.split('-');
-      if (parts.length < 3) return dbDateStr;
-      final int year = int.parse(parts[0]);
-      final int month = int.parse(parts[1]);
-      final int day = int.parse(parts[2]);
+  String _formatDate(String dbDateStr) => formatDateFromDbString(dbDateStr);
 
-      final List<String> months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'Mei',
-        'Jun',
-        'Jul',
-        'Agt',
-        'Sep',
-        'Okt',
-        'Nov',
-        'Des',
-      ];
-      return '$day ${months[month - 1]} $year';
-    } catch (_) {
-      return dbDateStr;
-    }
-  }
-
-  String _formatCurrency(int value) {
-    if (value <= 0) return 'Rp 0';
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-  }
+  String _formatCurrency(int value) => formatCurrency(value);
 
   Color _getStatusColor(String status) => bookingStatusColor(status);
   String _getStatusLabel(String status) => bookingStatusLabel(status);
+
 
   void _showRatingDialog(
     String bookingId,
@@ -88,10 +61,10 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: const Color(0xFF0F172A),
+              backgroundColor: AppColors.primaryDarkNavy,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                side: const BorderSide(color: Color(0xFF1E293B)),
+                side: const BorderSide(color: AppColors.secondaryDark),
               ),
               title: const Text(
                 'Beri Rating & Review',
@@ -214,13 +187,6 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                           'createdAt': FieldValue.serverTimestamp(),
                         };
 
-                        debugPrint(
-                          'Auth UID: ${FirebaseAuth.instance.currentUser?.uid}'
-                        );
-                        debugPrint(
-                          'Review User ID: ${reviewPayload['userId']}'
-                        );
-
                         // Jalankan transaction untuk memastikan konsistensi
                         await FirebaseFirestore.instance.runTransaction((transaction) async {
                           final DocumentReference bookingRef =
@@ -282,7 +248,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                             'createdAt': FieldValue.serverTimestamp(),
                           });
                         } catch (e) {
-                          debugPrint('Error sending admin notification for review: $e');
+                          debugPrint('[BookingHistory] Gagal mengirim notifikasi admin untuk review: $e');
                         }
 
                         // Kirim low_rating_alert ke Superadmin jika rating rata-rata stasiun turun di bawah 3.0
@@ -307,7 +273,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                             });
                           }
                         } catch (e) {
-                          debugPrint('Error sending low_rating_alert to superadmin: $e');
+                          debugPrint('[BookingHistory] Gagal mengirim low_rating_alert ke superadmin: $e');
                         }
 
                         if (mounted) {
@@ -720,7 +686,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                         'jamMulai': jamMulai,
                         'jamSelesai': jamSelesai,
                         'durasiJam': durasiJam,
-                        'createdAtMillis': ?createdAtMillis,
+                        'createdAtMillis': createdAtMillis,
                       },
                     );
                   },
@@ -730,7 +696,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                   SecondaryButton(
                     label: 'Review Terkirim',
                     height: 38,
-                    onTap: null, // Disabled
+                    onTap: null,
                   )
                 else
                   SecondaryButton(

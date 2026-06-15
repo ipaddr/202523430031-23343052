@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:gamezone/utils/helpers.dart';
-import 'package:gamezone/widgets/admin/unit_filter_bar.dart';
 
 // Kelas ringkasan data dashboard admin.
 class DashboardAdminSummary {
@@ -159,7 +158,7 @@ class DashboardService {
 
       return snapshot.size;
     } catch (e) {
-      debugPrint('Error getting booking hari ini: $e');
+      debugPrint('[Dashboard] Gagal memuat booking hari ini: $e');
       return 0;
     }
   }
@@ -183,7 +182,7 @@ class DashboardService {
         return createdAt != null && createdAt.isAfter(lastOpenedAt);
       }).length;
     } catch (e) {
-      debugPrint('Error getting station booking notification count: $e');
+      debugPrint('[Dashboard] Gagal memuat notifikasi booking stasiun: $e');
       return 0;
     }
   }
@@ -233,7 +232,7 @@ class DashboardService {
         }
       }
     } catch (e) {
-      debugPrint('Error appending user activities: $e');
+      debugPrint('[Dashboard] Gagal memuat aktivitas user: $e');
     }
   }
 
@@ -264,7 +263,7 @@ class DashboardService {
         );
       }
     } catch (e) {
-      debugPrint('Error appending station activities: $e');
+      debugPrint('[Dashboard] Gagal memuat aktivitas stasiun: $e');
     }
   }
 
@@ -314,7 +313,7 @@ class DashboardService {
         );
       }
     } catch (e) {
-      debugPrint('Error appending booking activities: $e');
+      debugPrint('[Dashboard] Gagal memuat aktivitas booking: $e');
     }
   }
 
@@ -352,7 +351,7 @@ class DashboardService {
         );
       }
     } catch (e) {
-      debugPrint('Error appending review activities: $e');
+      debugPrint('[Dashboard] Gagal memuat aktivitas review: $e');
     }
   }
 
@@ -376,26 +375,6 @@ class DashboardService {
     });
 
     return entries;
-  }
-
-  // Terapkan filter status ke list entri unit yang sudah dipetakan (setiap entri
-  // berbentuk {'id':..., 'data': {...}}). Mengembalikan list yang sudah difilter.
-  List<Map<String, dynamic>> applyStatusFilterToMappedEntries(
-    List<Map<String, dynamic>> mappedEntries,
-    UnitStatusFilter selectedStatus,
-  ) {
-    if (selectedStatus == UnitStatusFilter.all) return mappedEntries;
-
-    return mappedEntries
-        .where((entry) {
-          final data = entry['data'] as Map<String, dynamic>;
-          final String status = readUnitStatus(data);
-          if (selectedStatus == UnitStatusFilter.available) {
-            return isAvailableStatus(status);
-          }
-          return isFullStatus(status);
-        })
-        .toList(growable: false);
   }
 
   // Ringkasan analitik ringan dari sekumpulan entri yang sudah dipetakan.
@@ -445,7 +424,7 @@ class DashboardService {
       final snapshot = await _db.collection('units').get();
       return snapshot.size;
     } catch (e) {
-      debugPrint('Error getting total units: $e');
+      debugPrint('[Dashboard] Gagal memuat total unit: $e');
       return 0;
     }
   }
@@ -458,7 +437,7 @@ class DashboardService {
           .get();
       return snapshot.size;
     } catch (e) {
-      debugPrint('Error getting total units by station: $e');
+      debugPrint('[Dashboard] Gagal memuat total unit stasiun: $e');
       return 0;
     }
   }
@@ -555,7 +534,7 @@ class DashboardService {
         bookingCount: topEntry.value,
       );
     } catch (e) {
-      debugPrint('Error getting most booked unit: $e');
+      debugPrint('[Dashboard] Gagal memuat unit paling banyak dibooking: $e');
       return null;
     }
   }
@@ -592,7 +571,7 @@ class DashboardService {
       }
       return total;
     } catch (e) {
-      debugPrint('Error getting total pemasukan: $e');
+      debugPrint('[Dashboard] Gagal memuat total pemasukan: $e');
       return 0;
     }
   }
@@ -637,7 +616,7 @@ class DashboardService {
 
       return count == 0 ? 0 : total / count;
     } catch (e) {
-      debugPrint('Error getting rating game station: $e');
+      debugPrint('[Dashboard] Gagal memuat rating stasiun game: $e');
       return 0.0;
     }
   }
@@ -667,7 +646,7 @@ class DashboardService {
 
       return 0.0;
     } catch (e) {
-      debugPrint('Error getting station rating game station: $e');
+      debugPrint('[Dashboard] Gagal memuat rating stasiun: $e');
       return 0.0;
     }
   }
@@ -698,7 +677,7 @@ class DashboardService {
 
       return 0;
     } catch (e) {
-      debugPrint('Error getting unit count by type: $e');
+      debugPrint('[Dashboard] Gagal memuat total unit berdasarkan jenis: $e');
       return 0;
     }
   }
@@ -754,7 +733,7 @@ class DashboardService {
         available: available,
       );
     } catch (e) {
-      debugPrint('Error getting unit status summary: $e');
+      debugPrint('[Dashboard] Gagal memuat ringkasan status unit: $e');
       return const UnitStatusSummary(totalUnit: 0, full: 0, available: 0);
     }
   }
@@ -764,7 +743,7 @@ class DashboardService {
       final snapshot = await _db.collection('bookings').get();
       return snapshot.size;
     } catch (e) {
-      debugPrint('Error getting total booking: $e');
+      debugPrint('[Dashboard] Gagal memuat total booking: $e');
       return 0;
     }
   }
@@ -777,7 +756,7 @@ class DashboardService {
           .get();
       return snapshot.size;
     } catch (e) {
-      debugPrint('Error getting station total booking: $e');
+      debugPrint('[Dashboard] Gagal memuat total booking stasiun: $e');
       return 0;
     }
   }
@@ -799,7 +778,7 @@ class DashboardService {
 
       return snapshot.size;
     } catch (e) {
-      debugPrint('Error getting station booking hari ini: $e');
+      debugPrint('[Dashboard] Gagal memuat booking stasiun hari ini: $e');
       return 0;
     }
   }
@@ -815,7 +794,7 @@ class DashboardService {
       }
       return 0;
     } catch (e) {
-      debugPrint('Error getting station total pemasukan: $e');
+      debugPrint('[Dashboard] Gagal memuat total pemasukan stasiun: $e');
       return 0;
     }
   }
@@ -906,21 +885,7 @@ class DashboardService {
     return null;
   }
 
-  String _formatRelativeTime(DateTime timestamp) {
-    final Duration difference = DateTime.now().difference(timestamp);
-
-    if (difference.inSeconds < 60) {
-      return 'Baru saja';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m lalu';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}j lalu';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}h lalu';
-    }
-
-    return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
-  }
+  String _formatRelativeTime(DateTime timestamp) => formatRelativeTime(timestamp);
 }
 
 class UnitOverview {

@@ -12,7 +12,9 @@ class AuthService {
     final user = _auth.currentUser;
     if (user != null) {
       final providers = user.providerData.map((p) => p.providerId).toList();
-      debugPrint("ACTIVE PROVIDERS (getCurrentUser): ${providers.join(', ')}");
+      if (kDebugMode) {
+        debugPrint("[Auth] Active providers (getCurrentUser): ${providers.join(', ')}");
+      }
     }
     return user;
   }
@@ -26,9 +28,11 @@ class AuthService {
       final providers = currentUser.providerData
           .map((p) => p.providerId)
           .toList();
-      debugPrint(
-        "ACTIVE PROVIDERS (resolveCurrentUser): ${providers.join(', ')}",
-      );
+      if (kDebugMode) {
+        debugPrint(
+          "[Auth] Active providers (resolveCurrentUser): ${providers.join(', ')}",
+        );
+      }
       return currentUser;
     }
 
@@ -41,9 +45,11 @@ class AuthService {
         final providers = resolved.providerData
             .map((p) => p.providerId)
             .toList();
-        debugPrint(
-          "ACTIVE PROVIDERS (resolveCurrentUser resolved): ${providers.join(', ')}",
-        );
+        if (kDebugMode) {
+          debugPrint(
+            "[Auth] Active providers (resolveCurrentUser resolved): ${providers.join(', ')}",
+          );
+        }
       }
       return resolved;
     } catch (_) {
@@ -64,9 +70,11 @@ class AuthService {
       final providers = cred.user!.providerData
           .map((p) => p.providerId)
           .toList();
-      debugPrint(
-        "ACTIVE PROVIDERS (signInWithEmailAndPassword): ${providers.join(', ')}",
-      );
+      if (kDebugMode) {
+        debugPrint(
+          "[Auth] Active providers (signInWithEmailAndPassword): ${providers.join(', ')}",
+        );
+      }
     }
     return cred;
   }
@@ -98,9 +106,11 @@ class AuthService {
       final providers = cred.user!.providerData
           .map((p) => p.providerId)
           .toList();
-      debugPrint(
-        "ACTIVE PROVIDERS (signInWithGoogle): ${providers.join(', ')}",
-      );
+      if (kDebugMode) {
+        debugPrint(
+          "[Auth] Active providers (signInWithGoogle): ${providers.join(', ')}",
+        );
+      }
     }
     return cred;
   }
@@ -131,9 +141,11 @@ class AuthService {
     try {
       await user.linkWithCredential(googleCredential);
       final providers = user.providerData.map((p) => p.providerId).toList();
-      debugPrint(
-        "ACTIVE PROVIDERS (linkGoogleToCurrentUser): ${providers.join(', ')}",
-      );
+      if (kDebugMode) {
+        debugPrint(
+          "[Auth] Active providers (linkGoogleToCurrentUser): ${providers.join(', ')}",
+        );
+      }
     } on FirebaseAuthException catch (e) {
       // provider-already-linked: Google sudah ter-link → tidak masalah
       // credential-already-in-use: credential Google ini sudah dipakai akun lain
@@ -162,9 +174,11 @@ class AuthService {
     try {
       await user.linkWithCredential(credential);
       final providers = user.providerData.map((p) => p.providerId).toList();
-      debugPrint(
-        "ACTIVE PROVIDERS (linkPasswordToCurrentUser): ${providers.join(', ')}",
-      );
+      if (kDebugMode) {
+        debugPrint(
+          "[Auth] Active providers (linkPasswordToCurrentUser): ${providers.join(', ')}",
+        );
+      }
     } on FirebaseAuthException catch (e) {
       if (e.code == 'provider-already-linked') return;
       rethrow;

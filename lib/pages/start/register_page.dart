@@ -7,8 +7,8 @@ import 'package:file_picker/file_picker.dart';
 
 import '../../styles/app_colors.dart';
 import '../../styles/app_textstyle.dart';
-import '../../widgets/auth_widgets.dart';
-import '../../widgets/background.dart';
+import '../../widgets/common/auth_widgets.dart';
+import '../../widgets/common/background.dart';
 import '../../services/registration_service.dart';
 
 // Halaman registrasi untuk user biasa dan admin station.
@@ -188,7 +188,7 @@ class _RegisterPageState extends State<RegisterPage> {
         allowMultiple: true,
       );
       if (result != null && result.files.isNotEmpty) {
-        // Filter out files larger than 10 MB to prevent extremely large uploads
+        // Saring berkas yang lebih besar dari 10 MB untuk mencegah unggahan berkas yang terlalu besar
         final List<PlatformFile> filteredFiles = result.files
             .where((file) => file.size < 10 * 1024 * 1024)
             .toList();

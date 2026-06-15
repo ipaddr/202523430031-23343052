@@ -5,13 +5,13 @@ import '../../services/firestore_service.dart';
 
 import '../../styles/app_colors.dart';
 import '../../styles/app_textstyle.dart';
-import '../../widgets/background.dart';
+import '../../widgets/common/background.dart';
 import '../../widgets/superadmin/superadmin_activity_item.dart';
 import '../../widgets/superadmin/superadmin_bottom_navbar.dart';
 import '../../widgets/superadmin/superadmin_sheet_header.dart';
-import '../../widgets/superadmin/superadmin_stat_card.dart';
+import '../../widgets/common/stats_card.dart';
 import '../../widgets/superadmin/superadmin_header.dart';
-import '../profile_page.dart';
+import '../shared/profile_page.dart';
 import 'users_page.dart';
 import 'verify_page.dart';
 
@@ -53,14 +53,13 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         });
       }
       return const Scaffold(
-        backgroundColor: Color(0xFF0F172A),
+        backgroundColor: AppColors.primaryDarkNavy,
         body: Center(
           child: CircularProgressIndicator(color: Color(0xFF22D3EE)),
         ),
       );
     }
 
-    // Layout utama berisi header, konten tab, lalu navigasi bawah.
     return Scaffold(
       backgroundColor: Colors.transparent,
       // Mengaktifkan resize agar konten utama menyesuaikan tinggi di atas keyboard
@@ -82,7 +81,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                 ),
               ),
 
-              // Navigasi Bar Neon Berkilau (Hanya muncul jika keyboard tidak aktif)
               if (MediaQuery.of(context).viewInsets.bottom == 0)
                 SuperAdminBottomNavBar(
                   currentIndex: _activeTabIndex,
@@ -117,7 +115,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         return Container(
           height: MediaQuery.of(context).size.height * 0.75,
           decoration: const BoxDecoration(
-            color: Color(0xFF0F172A),
+            color: AppColors.primaryDarkNavy,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             border: Border(
               top: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
@@ -177,7 +175,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         category = 'Verifikasi';
                       } else if (type == 'admin_rejected') {
                         icon = Icons.cancel_rounded;
-                        iconColor = const Color(0xFFEF4444);
+                        iconColor = AppColors.errorRed;
                         category = 'Penolakan';
                       } else if (type == 'station_first_booking') {
                         icon = Icons.star_rounded;
@@ -185,7 +183,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         category = 'Booking';
                       } else if (type == 'low_rating_alert') {
                         icon = Icons.warning_amber_rounded;
-                        iconColor = const Color(0xFFEF4444);
+                        iconColor = AppColors.errorRed;
                         category = 'Laporan';
                       }
 
@@ -245,7 +243,7 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
         return Container(
           height: MediaQuery.of(context).size.height * 0.8,
           decoration: const BoxDecoration(
-            color: Color(0xFF0F172A),
+            color: AppColors.primaryDarkNavy,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             border: Border(
               top: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
@@ -370,7 +368,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
   }
 
   Widget _buildActiveTabContent() {
-    // Konten berganti sesuai tab yang sedang aktif.
     switch (_activeTabIndex) {
       case 0:
         return _buildBerandaTab();
@@ -502,7 +499,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         vertical: 10,
                       ),
                       children: [
-                        // Grid Bagian Statistik tanpa persentase
                         GridView.count(
                           crossAxisCount: 2,
                           shrinkWrap: true,
@@ -511,41 +507,40 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                           mainAxisSpacing: 16,
                           childAspectRatio: 1.25,
                           children: [
-                            SuperAdminStatCard(
+                            StatsCard(
                               icon: Icons.people_rounded,
                               iconColor: const Color(0xFF22D3EE),
-                              label: 'TOTAL USER',
+                              title: 'TOTAL USER',
                               value: totalUsers.toString().replaceAllMapped(
                                 RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
                                 (Match m) => '${m[1]},',
                               ),
                             ),
-                            SuperAdminStatCard(
+                            StatsCard(
                               icon: Icons.gamepad_rounded,
                               iconColor: const Color(0xFFC084FC),
-                              label: 'GAME STATION',
+                              title: 'GAME STATION',
                               value: totalStations.toString(),
                             ),
-                            SuperAdminStatCard(
+                            StatsCard(
                               icon: Icons.meeting_room_rounded,
                               iconColor: const Color(0xFF22D3EE),
-                              label: 'TOTAL UNIT',
+                              title: 'TOTAL UNIT',
                               value: totalUnits.toString().replaceAllMapped(
                                 RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
                                 (Match m) => '${m[1]},',
                               ),
                             ),
-                            SuperAdminStatCard(
+                            StatsCard(
                               icon: Icons.admin_panel_settings_rounded,
                               iconColor: const Color(0xFFC084FC),
-                              label: 'TOTAL ADMIN',
+                              title: 'TOTAL ADMIN',
                               value: totalAdmins.toString(),
                             ),
                           ],
                         ),
                         const SizedBox(height: 24),
 
-                        // Judul Bagian
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -572,7 +567,6 @@ class _SuperAdminDashboardPageState extends State<SuperAdminDashboardPage> {
                         ),
                         const SizedBox(height: 10),
 
-                        // Daftar Aktivitas Terbaru (Dinamis Langsung dari Firestore)
                         if (activities.isEmpty)
                           Container(
                             padding: const EdgeInsets.all(24),

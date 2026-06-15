@@ -4,14 +4,15 @@ import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/styles/gradients.dart';
+import 'package:gamezone/utils/helpers.dart';
 
-class AdminStatCard extends StatelessWidget {
+class StatsCard extends StatelessWidget {
   final String title;
   final String value;
   final IconData icon;
   final Color iconColor;
 
-  const AdminStatCard({
+  const StatsCard({
     super.key,
     required this.title,
     required this.value,
@@ -179,21 +180,7 @@ class RevenueCard extends StatelessWidget {
     this.title = 'Total Pemasukan',
   });
 
-  String _formatRupiah(int value) {
-    final String digits = value.abs().toString();
-    final StringBuffer buffer = StringBuffer();
-
-    for (int index = 0; index < digits.length; index++) {
-      final int remaining = digits.length - index;
-      buffer.write(digits[index]);
-      if (remaining > 1 && remaining % 3 == 1) {
-        buffer.write('.');
-      }
-    }
-
-    final String formatted = buffer.toString();
-    return value < 0 ? '-Rp $formatted' : 'Rp $formatted';
-  }
+  String _formatRupiah(int value) => formatRupiah(value);
 
   @override
   Widget build(BuildContext context) {

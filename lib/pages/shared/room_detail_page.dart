@@ -6,10 +6,12 @@ import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/styles/gradients.dart';
-import 'package:gamezone/widgets/background.dart';
+import 'package:gamezone/widgets/common/background.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
 import 'package:gamezone/utils/helpers.dart';
 import 'station_detail_page.dart' show ViewMode;
+import 'package:gamezone/widgets/common/custom_confirm_dialog.dart';
+import 'package:gamezone/widgets/common/page_header.dart';
 
 /// Halaman detail room/unit yang digunakan bersama oleh User dan Admin.
 /// Aksi berbeda berdasarkan [ViewMode] yang diteruskan via route arguments.
@@ -101,36 +103,12 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
     return (v != null && v.trim().isNotEmpty) ? v.trim() : null;
   }
 
-  String _formatCurrency(int value) {
-    if (value <= 0) return '-';
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-  }
+  String _formatCurrency(int value) => formatCurrencyWithDash(value);
 
-  Color _statusColor(String status) {
-    final lower = status.trim().toLowerCase();
-    if (lower == 'digunakan') return AppColors.errorRed;
-    if (lower == 'tersedia') return AppColors.successGreen;
-    if (lower == 'perawatan') return AppColors.warningOrange;
-    if (lower == 'tidak_aktif' ||
-        lower == 'tidak_tersedia' ||
-        lower == 'inactive') {
-      return AppColors.softGray;
-    }
-    return AppColors.softGray;
-  }
+  Color _statusColor(String status) => unitStatusColor(status);
 
-  String _statusLabel(String status) {
-    final lower = status.trim().toLowerCase();
-    if (lower == 'digunakan') return 'Digunakan';
-    if (lower == 'tersedia') return 'Tersedia';
-    if (lower == 'perawatan') return 'Perawatan';
-    if (lower == 'tidak_aktif' ||
-        lower == 'tidak_tersedia' ||
-        lower == 'inactive') {
-      return 'Tidak Tersedia';
-    }
-    return status.isEmpty ? 'Unknown' : status;
-  }
+  String _statusLabel(String status) => unitStatusLabel(status);
+
 
   List<String> _collectChipValues(
     Map<String, dynamic> data,
@@ -196,51 +174,15 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
     if (_unitId.isEmpty || _isDeleting) return;
     final messenger = ScaffoldMessenger.of(context);
 
-    final bool? confirmed = await showDialog<bool>(
+    final bool confirmed = await showCustomConfirmDialog(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        backgroundColor: AppColors.primaryDarkNavy,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.radiusXL),
-          side: BorderSide(color: AppColors.accentCyan.withValues(alpha: 0.12)),
-        ),
-        title: Text(
-          'Hapus Unit',
-          style: AppTextStyle.h4.copyWith(
-            color: AppColors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Text(
-          'Unit "$unitName" akan dihapus permanen. Lanjutkan?',
-          style: AppTextStyle.body3.copyWith(color: AppColors.softGray),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx, false),
-            child: Text(
-              'Batal',
-              style: AppTextStyle.buttonSmall.copyWith(
-                color: AppColors.softGray,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.errorRed,
-              foregroundColor: AppColors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-              ),
-            ),
-            onPressed: () => Navigator.pop(dialogCtx, true),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
+      title: 'Hapus Unit',
+      content: 'Unit "$unitName" akan dihapus permanen. Lanjutkan?',
+      confirmLabel: 'Hapus',
+      isDestructive: true,
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     setState(() => _isDeleting = true);
     try {
@@ -379,43 +321,7 @@ class _SharedRoomDetailPageState extends State<SharedRoomDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-          child: Row(
-            children: [
-              InkWell(
-                onTap: () => Navigator.pop(context),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141B31),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF23304C)),
-                  ),
-                  child: const Icon(
-                    Icons.chevron_left_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Detail Unit',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
+        const PageHeader(title: 'Detail Unit'),
 
         Expanded(
           child: ListView(

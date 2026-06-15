@@ -6,14 +6,14 @@ import 'package:gamezone/services/auth_service.dart';
 import 'package:gamezone/services/firestore_service.dart';
 import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
-import 'package:gamezone/widgets/background.dart';
+import 'package:gamezone/widgets/common/background.dart';
 import 'package:gamezone/widgets/admin/admin_bottom_navbar.dart';
 import 'package:gamezone/widgets/admin/admin_header.dart';
-import 'package:gamezone/widgets/admin/admin_stat_card.dart';
+import 'package:gamezone/widgets/common/stats_card.dart';
 import 'package:gamezone/widgets/admin/room_status_chart.dart';
 import 'package:gamezone/pages/admin/room_page.dart';
 import 'package:gamezone/pages/admin/booking_page.dart';
-import '../profile_page.dart';
+import '../shared/profile_page.dart';
 
 // Dashboard utama admin yang hanya menyusun widget reusable GameZone.
 class AdminDashboardPage extends StatefulWidget {
@@ -141,7 +141,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       return;
     }
 
-    // Sheet notifikasi booking terbaru milik station admin aktif.
+    // Lembar notifikasi booking terbaru milik stasiun admin aktif.
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -150,7 +150,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         return Container(
           height: MediaQuery.of(sheetContext).size.height * 0.75,
           decoration: const BoxDecoration(
-            color: Color(0xFF0F172A),
+            color: AppColors.primaryDarkNavy,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             border: Border(
               top: BorderSide(color: Color(0xFF22D3EE), width: 1.5),
@@ -334,7 +334,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   String _formatRelativeTime(Timestamp? timestamp) {
-    // Helper untuk mengubah timestamp menjadi label waktu yang singkat.
+    // Mengubah stempel waktu menjadi label waktu yang singkat.
     if (timestamp == null) return 'Baru saja';
     final DateTime dateTime = timestamp.toDate();
     final Duration difference = DateTime.now().difference(dateTime);
@@ -368,7 +368,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         });
       }
       return const Scaffold(
-        backgroundColor: Color(0xFF0F172A),
+        backgroundColor: AppColors.primaryDarkNavy,
         body: Center(
           child: CircularProgressIndicator(color: AppColors.accentCyan),
         ),
@@ -377,7 +377,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      // Menonaktifkan resize agar background tetap stabil di belakang keyboard
+      // Menonaktifkan resize agar latar belakang tetap stabil di belakang keyboard
       resizeToAvoidBottomInset: false,
       body: GameZoneBackground(
         child: SafeArea(
@@ -558,13 +558,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           mainAxisSpacing: 16,
           childAspectRatio: 1.25,
           children: [
-            AdminStatCard(
+            StatsCard(
               icon: Icons.book_online_rounded,
               title: 'Total Booking',
               value: summary.totalBooking.toString(),
               iconColor: AppColors.accentCyan,
             ),
-            AdminStatCard(
+            StatsCard(
               icon: Icons.devices_other_rounded,
               title: 'Total Unit',
               value: summary.totalUnit.toString(),
@@ -731,7 +731,7 @@ class RatingAnalyticsCard extends StatelessWidget {
               ),
               const Divider(color: Color(0xFF334155), height: 1),
 
-              // List Review Terbaru
+              // Daftar Ulasan Terbaru
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(

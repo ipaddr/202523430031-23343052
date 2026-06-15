@@ -3,11 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import '../services/auth_service.dart';
-import '../config/cloudinary_config.dart';
-import '../services/firestore_service.dart';
-import '../styles/app_colors.dart';
-import '../widgets/background.dart';
+import '../../services/auth_service.dart';
+import '../../config/cloudinary_config.dart';
+import '../../services/firestore_service.dart';
+import '../../styles/app_colors.dart';
+import '../../widgets/common/background.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -306,7 +306,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   void _showPickerOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: AppColors.primaryDarkNavy,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -648,7 +648,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: Theme(
             data: Theme.of(context).copyWith(
               timePickerTheme: const TimePickerThemeData(
-                backgroundColor: Color(0xFF0F172A),
+                backgroundColor: AppColors.primaryDarkNavy,
               ),
             ),
             child: child ?? const SizedBox.shrink(),

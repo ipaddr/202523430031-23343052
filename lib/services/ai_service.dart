@@ -27,17 +27,14 @@ class AiService {
   Future<String> sendMessage(String userMessage) async {
     final String key = _apiKey;
     if (key.trim().isEmpty) {
-      debugPrint('================ GEMINI API ERROR ================');
-      debugPrint(
-        'Error: GEMINI_API_KEY is empty or not loaded from .env file.',
-      );
-      debugPrint('Please check your root .env configuration.');
-      debugPrint('==================================================');
+      debugPrint('[AI] GEMINI_API_KEY kosong atau tidak terbaca dari .env');
       return 'AI sedang sibuk. Silakan coba lagi beberapa saat.';
     }
 
     if (userMessage.trim().isEmpty) {
-      debugPrint('Gemini API Audit: Ignoring empty request.');
+      if (kDebugMode) {
+        debugPrint('[AI] Pesan kosong diabaikan');
+      }
       return 'Pesan tidak boleh kosong.';
     }
 
@@ -58,10 +55,8 @@ class AiService {
         },
       ],
       'generationConfig': {
-        'maxOutputTokens':
-            800, // Ditingkatkan ke 800 agar respons lengkap tidak terpotong oleh batas token
-        'temperature':
-            0.6, // Diturunkan sedikit ke 0.6 agar respon lebih konsisten dan stabil sesuai instruksi
+        'maxOutputTokens': 800,
+        'temperature': 0.6,
       },
     };
 
@@ -69,12 +64,9 @@ class AiService {
         ? '${key.substring(0, 5)}...${key.substring(key.length - 3)}'
         : 'INVALID_KEY';
 
-    debugPrint('================ GEMINI API REQUEST ================');
-    debugPrint('Model: $_model');
-    debugPrint('Endpoint: $_baseUrl?key=$obfuscatedKey');
-    debugPrint('API Key Loaded from .env: Yes');
-    debugPrint('Request Body: ${jsonEncode(body)}');
-    debugPrint('====================================================');
+    if (kDebugMode) {
+      debugPrint('[AI] Request model: $_model, endpoint: $_baseUrl?key=$obfuscatedKey');
+    }
 
     try {
       final http.Response response = await http
@@ -85,13 +77,9 @@ class AiService {
           )
           .timeout(const Duration(seconds: 15));
 
-      // Cetak response body mentah untuk kebutuhan debugging dan perbandingan audit
-      debugPrint('GEMINI RAW RESPONSE BODY: ${response.body}');
-
-      debugPrint('================ GEMINI API RESPONSE ===============');
-      debugPrint('Status Code: ${response.statusCode}');
-      debugPrint('Response Body: ${response.body}');
-      debugPrint('====================================================');
+      if (kDebugMode) {
+        debugPrint('[AI] Response status code: ${response.statusCode}');
+      }
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data =
@@ -106,11 +94,8 @@ class AiService {
         }
         return 'Terjadi kesalahan. Silakan coba kembali.';
       } else {
-        // Log error asli dari Google di console demi kemudahan debugging
-        debugPrint('Gemini API Raw Error Status Code: ${response.statusCode}');
-        debugPrint('Gemini API Raw Error Response Body: ${response.body}');
+        debugPrint('[AI] Gemini API Error: HTTP ${response.statusCode} - ${response.body}');
 
-        // Parse detail error untuk kebutuhan mapping
         String status = '';
         String rawMessage = '';
         try {
@@ -119,13 +104,12 @@ class AiService {
           status = errorData['error']?['status']?.toString() ?? '';
           rawMessage = errorData['error']?['message']?.toString() ?? '';
         } catch (e) {
-          debugPrint('Failed to parse error response JSON: $e');
+          debugPrint('[AI] Gagal decode JSON error response: $e');
         }
 
         final String normalizedMessage = rawMessage.toLowerCase();
         final String normalizedStatus = status.toUpperCase();
 
-        // Mapping kode error ke pesan yang sesuai.
         if (response.statusCode == 429 ||
             normalizedStatus == 'RESOURCE_EXHAUSTED' ||
             normalizedMessage.contains('exhausted') ||
@@ -137,20 +121,19 @@ class AiService {
             normalizedMessage.contains('limit') ||
             normalizedMessage.contains('exceeded') ||
             normalizedStatus == 'RESOURCE_EXHAUSTED') {
-          // Status code 429 juga bisa masuk ke kuota penuh tergantung isi message
           return 'Kuota AI sedang penuh. Coba lagi nanti.';
         } else {
           return 'Terjadi kesalahan. Silakan coba kembali.';
         }
       }
     } on TimeoutException catch (e) {
-      debugPrint('AiService TimeoutException: $e');
+      debugPrint('[AI] Request timed out: $e');
       return 'Permintaan terlalu lama. Coba lagi.';
     } on SocketException catch (e) {
-      debugPrint('AiService SocketException: $e');
+      debugPrint('[AI] SocketException: $e');
       return 'Koneksi internet bermasalah.';
     } catch (e) {
-      debugPrint('AiService exception: $e');
+      debugPrint('[AI] Exception: $e');
       final String errStr = e.toString().toLowerCase();
       if (errStr.contains('timeout')) {
         return 'Permintaan terlalu lama. Coba lagi.';

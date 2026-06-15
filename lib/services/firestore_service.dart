@@ -41,11 +41,13 @@ class FirestoreService {
         'createdAt': FieldValue.serverTimestamp(),
       };
       await _db.collection('notifications').doc(notifId).set(payload);
-      debugPrint(
-        'FirestoreService Notification Sent: $title ($type) untuk $roleTarget',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '[Firestore] Notification Sent: $title ($type) untuk $roleTarget',
+        );
+      }
     } catch (e) {
-      debugPrint('Error sending notification: $e');
+      debugPrint('[Firestore] Gagal mengirim notifikasi: $e');
     }
   }
 
@@ -169,7 +171,7 @@ class FirestoreService {
         }
       }
     } catch (e) {
-      debugPrint('getStationByOwnerId error: $e');
+      debugPrint('[Firestore] Error getStationByOwnerId: $e');
     }
     return null;
   }
@@ -360,7 +362,7 @@ class FirestoreService {
         }
       }
     } catch (e) {
-      debugPrint('Error generating notification in createBooking: $e');
+      debugPrint('[Firestore] Gagal generate notifikasi di createBooking: $e');
     }
   }
 
@@ -373,9 +375,46 @@ class FirestoreService {
     String bookingId,
     Map<String, dynamic> updates,
   ) async {
+    String oldStatusPembayaran = '';
+    int totalHarga = 0;
+    String stationId = '';
+    try {
+      final oldSnap = await _db.collection('bookings').doc(bookingId).get();
+      if (oldSnap.exists) {
+        final oldData = oldSnap.data() as Map<String, dynamic>?;
+        oldStatusPembayaran = oldData?['statusPembayaran']?.toString() ?? '';
+        totalHarga = (oldData?['totalHarga'] is num)
+            ? (oldData?['totalHarga'] as num).toInt()
+            : int.tryParse(oldData?['totalHarga']?.toString() ?? '0') ?? 0;
+        stationId = oldData?['stationId']?.toString() ?? '';
+      }
+    } catch (e) {
+      debugPrint('[Firestore] Gagal mengambil data lama booking di updateBooking: $e');
+    }
+
     final Map<String, dynamic> payload = Map<String, dynamic>.from(updates)
       ..['updatedAt'] = FieldValue.serverTimestamp();
     await _db.collection('bookings').doc(bookingId).update(payload);
+
+    final String newBookingStatus = updates['statusBooking']?.toString() ?? '';
+    final String newPaymentStatus = updates['statusPembayaran']?.toString() ?? '';
+    if (oldStatusPembayaran == 'paid' && stationId.isNotEmpty) {
+      if (newBookingStatus == 'cancelled' ||
+          newBookingStatus == 'rejected' ||
+          newPaymentStatus == 'cancelled' ||
+          newPaymentStatus == 'expired') {
+        try {
+          await _db.collection('stations').doc(stationId).update({
+            'totalPemasukan': FieldValue.increment(-totalHarga),
+          });
+          if (kDebugMode) {
+            debugPrint('[Firestore] Pemasukan stasiun $stationId didecrement sebesar $totalHarga karena booking $bookingId dibatalkan.');
+          }
+        } catch (e) {
+          debugPrint('[Firestore] Gagal decrement totalPemasukan stasiun: $e');
+        }
+      }
+    }
 
     // Ambil data terbaru untuk notifikasi
     try {
@@ -399,9 +438,11 @@ class FirestoreService {
                   'status': 'digunakan',
                   'updatedAt': FieldValue.serverTimestamp(),
                 });
-                debugPrint(
-                  'FirestoreService: status unit $unitId diubah menjadi digunakan karena status booking: $newStatus',
-                );
+                if (kDebugMode) {
+                  debugPrint(
+                    '[Firestore] Status unit $unitId diubah menjadi digunakan karena booking $newStatus',
+                  );
+                }
               } else if (newStatus == 'completed' ||
                   newStatus == 'cancelled' ||
                   newStatus == 'rejected') {
@@ -409,9 +450,11 @@ class FirestoreService {
                   'status': 'tersedia',
                   'updatedAt': FieldValue.serverTimestamp(),
                 });
-                debugPrint(
-                  'FirestoreService: status unit $unitId diubah menjadi tersedia karena status booking: $newStatus',
-                );
+                if (kDebugMode) {
+                  debugPrint(
+                    '[Firestore] Status unit $unitId diubah menjadi tersedia karena booking $newStatus',
+                  );
+                }
               }
             }
 
@@ -456,6 +499,26 @@ class FirestoreService {
                 message: 'Booking Anda ditolak oleh Game Station.',
               );
             } else if (newStatus == 'cancelled') {
+              final String customReason = updates['cancelReason']?.toString() ?? '';
+              
+              String title = 'Booking Dibatalkan';
+              String message = 'Booking Anda telah dibatalkan.';
+              
+              if (customReason.toLowerCase().contains('ditolak') || customReason.toLowerCase().contains('reject')) {
+                title = 'Booking Ditolak oleh Admin';
+                message = customReason.isNotEmpty ? customReason : 'Booking Anda ditolak oleh Admin.';
+              } else if (customReason.toLowerCase().contains('dibatalkan karena jadwal telah dikonfirmasi') || 
+                         customReason.toLowerCase().contains('slot sudah digunakan') || 
+                         customReason.toLowerCase().contains('bentrok')) {
+                title = 'Booking Dibatalkan Otomatis';
+                message = customReason.isNotEmpty ? customReason : 'Booking dibatalkan otomatis karena bentrok jadwal.';
+              } else if (customReason.isNotEmpty) {
+                message = customReason;
+              } else {
+                title = 'Booking Dibatalkan';
+                message = 'Booking dibatalkan karena pembayaran tidak diselesaikan.';
+              }
+
               // USER: booking_cancelled
               await _sendNotificationHelper(
                 targetId: uId,
@@ -463,9 +526,8 @@ class FirestoreService {
                 stationId: stationId,
                 bookingId: bookingId,
                 type: 'booking_cancelled',
-                title: 'Booking Dibatalkan Otomatis',
-                message:
-                    'Booking dibatalkan karena pembayaran tidak diselesaikan.',
+                title: title,
+                message: message,
               );
               // ADMIN: booking_cancelled
               await _sendNotificationHelper(
@@ -474,9 +536,8 @@ class FirestoreService {
                 stationId: stationId,
                 bookingId: bookingId,
                 type: 'booking_cancelled',
-                title: 'Booking Dibatalkan Otomatis',
-                message:
-                    'Booking dibatalkan karena pembayaran tidak diselesaikan.',
+                title: title,
+                message: message,
               );
             } else if (newStatus == 'completed') {
               // USER: booking_completed
@@ -546,7 +607,7 @@ class FirestoreService {
         }
       }
     } catch (e) {
-      debugPrint('Error generating notification in updateBooking: $e');
+      debugPrint('[Firestore] Gagal generate notifikasi di updateBooking: $e');
     }
   }
 
@@ -634,13 +695,14 @@ class FirestoreService {
 
       if (expiredCount > 0) {
         await batch.commit();
-        debugPrint(
-          'FirestoreService: $expiredCount booking expired '
-          'untuk user $userId.',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[Firestore] $expiredCount booking expired untuk user $userId',
+          );
+        }
       }
     } catch (e) {
-      debugPrint('expireOverdueBookings error: $e');
+      debugPrint('[Firestore] Error expireOverdueBookings: $e');
     }
   }
 
@@ -694,13 +756,13 @@ class FirestoreService {
         if (endTime == null) continue;
 
         if (now.isAfter(endTime) || now.isAtSameMomentAs(endTime)) {
-          // 1. Update Booking status to completed
+          // 1. Perbarui status Booking menjadi selesai
           batch.update(doc.reference, {
             'statusBooking': 'completed',
             'updatedAt': FieldValue.serverTimestamp(),
           });
 
-          // 2. Revert Unit status to tersedia
+          // 2. Kembalikan status Unit menjadi tersedia
           if (unitId.isNotEmpty) {
             batch.update(_db.collection('units').doc(unitId), {
               'status': 'tersedia',
@@ -708,7 +770,7 @@ class FirestoreService {
             });
           }
 
-          // 3. Create Notification for user
+          // 3. Buat Notifikasi untuk pengguna
           if (uId.isNotEmpty) {
             _addNotificationToBatch(
               batch,
@@ -729,12 +791,14 @@ class FirestoreService {
 
       if (completedCount > 0) {
         await batch.commit();
-        debugPrint(
-          'FirestoreService: $completedCount booking otomatis diselesaikan.',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[Firestore] $completedCount booking otomatis diselesaikan',
+          );
+        }
       }
     } catch (e) {
-      debugPrint('completeFinishedBookings error: $e');
+      debugPrint('[Firestore] Error completeFinishedBookings: $e');
     }
   }
 
@@ -752,7 +816,7 @@ class FirestoreService {
 
       return DateTime(year, month, day, hour, minute);
     } catch (e) {
-      debugPrint('Error parsing booking end time: $e');
+      debugPrint('[Firestore] Error parsing booking end time: $e');
       return null;
     }
   }
@@ -803,7 +867,7 @@ class FirestoreService {
       }
       if (cancelledCount > 0) await batch.commit();
     } catch (e) {
-      debugPrint('cancelConflictingBookings error: $e');
+      debugPrint('[Firestore] Error cancelConflictingBookings: $e');
     }
     return cancelledCount;
   }
@@ -894,24 +958,25 @@ class FirestoreService {
             'updatedAt': FieldValue.serverTimestamp(),
           });
           cancelledCount++;
-          debugPrint(
-            'FirestoreService: batalkan booking ${doc.id} '
-            '(${data['jamMulai']}–${data['jamSelesai']}) '
-            'karena konflik dengan booking $paidBookingId.',
-          );
+          if (kDebugMode) {
+            debugPrint(
+              '[Firestore] Batalkan booking ${doc.id} karena konflik dengan $paidBookingId',
+            );
+          }
         }
       }
 
       if (cancelledCount > 0) {
         await batch.commit();
-        debugPrint(
-          'FirestoreService: $cancelledCount booking dibatalkan '
-          'karena konflik dengan booking $paidBookingId.',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[Firestore] $cancelledCount booking dibatalkan karena konflik dengan $paidBookingId',
+          );
+        }
       }
     } catch (e) {
       // Tidak throw — pembayaran sudah berhasil, log saja
-      debugPrint('cancelConflictingBookingsAfterPayment error: $e');
+      debugPrint('[Firestore] Error cancelConflictingBookingsAfterPayment: $e');
     }
   }
 

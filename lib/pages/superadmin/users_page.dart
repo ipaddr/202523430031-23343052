@@ -5,6 +5,8 @@ import 'package:gamezone/widgets/common/custom_image_loader.dart';
 import 'users_detail_page.dart';
 import 'package:gamezone/widgets/common/custom_empty_state.dart';
 import 'package:gamezone/widgets/common/custom_search_bar.dart';
+import 'package:gamezone/widgets/common/custom_confirm_dialog.dart';
+import 'package:gamezone/styles/app_colors.dart';
 
 /// Halaman Kelola Pengguna & Game Station untuk Super Admin
 class UsersPage extends StatefulWidget {
@@ -60,53 +62,14 @@ class _UsersPageState extends State<UsersPage> {
 
   // Dialog konfirmasi sebelum data benar-benar dihapus.
   Future<bool> _showConfirmDeleteDialog(String title, String content) async {
-    final bool? result = await showDialog<bool>(
+    final bool confirm = await showCustomConfirmDialog(
       context: context,
-      builder: (context) {
-        return Theme(
-          data: ThemeData.dark(),
-          child: AlertDialog(
-            backgroundColor: const Color(0xFF0F172A),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(color: Color(0xFF1E293B)),
-            ),
-            title: Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: Text(content),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text(
-                  'Batal',
-                  style: TextStyle(color: Color(0xFF64748B)),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFEF4444),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text(
-                  'Hapus',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+      title: title,
+      content: content,
+      confirmLabel: 'Hapus',
+      isDestructive: true,
     );
-    return result ?? false;
+    return confirm;
   }
 
   void _showSuccessSnackBar(String msg) {
@@ -120,14 +83,13 @@ class _UsersPageState extends State<UsersPage> {
   void _showErrorSnackBar(String msg) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(backgroundColor: const Color(0xFFEF4444), content: Text(msg)),
+        SnackBar(backgroundColor: AppColors.errorRed, content: Text(msg)),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Konten halaman
     return SafeArea(
       child: Center(
         child: ConstrainedBox(
@@ -172,7 +134,6 @@ class _UsersPageState extends State<UsersPage> {
 
                         return Column(
                           children: [
-                            // Tab Navigasi Kapsul
                             Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 20,
@@ -205,7 +166,6 @@ class _UsersPageState extends State<UsersPage> {
                               ),
                             ),
 
-                            // Konten List Pengguna & Game Station
                             Expanded(
                               child: _buildListContent(
                                 usersSnapshot,
@@ -349,7 +309,6 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // Kartu ringkas untuk game station yang sudah diverifikasi.
   Widget _buildStationCard(String stationId, Map<String, dynamic> data) {
     final String name = data['namaStation'] ?? 'Nama Tidak Diketahui';
     final int rooms = data['jumlahRooms'] ?? 0;
@@ -524,7 +483,7 @@ class _UsersPageState extends State<UsersPage> {
                       child: Text(
                         'Hapus',
                         style: TextStyle(
-                          color: Color(0xFFEF4444),
+                          color: AppColors.errorRed,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -540,7 +499,6 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // Kartu ringkas untuk data pengguna standar.
   Widget _buildUserCard(String userId, Map<String, dynamic> data) {
     final String name = data['nama'] ?? 'Tanpa Nama';
     final String email = data['email'] ?? '';
@@ -616,7 +574,7 @@ class _UsersPageState extends State<UsersPage> {
                               isBanned ? 'BANNED' : 'AKTIF',
                               style: TextStyle(
                                 color: isBanned
-                                    ? const Color(0xFFEF4444)
+                                    ? AppColors.errorRed
                                     : const Color(0xFF10B981),
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
@@ -721,7 +679,7 @@ class _UsersPageState extends State<UsersPage> {
                       child: Text(
                         'Hapus',
                         style: TextStyle(
-                          color: Color(0xFFEF4444),
+                          color: AppColors.errorRed,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),

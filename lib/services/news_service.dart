@@ -14,23 +14,18 @@ class NewsService {
   Future<List<NewsModel>> getLatestGamingNews() async {
     // Gunakan cache hanya jika terisi (hasil fetch sukses sebelumnya)
     if (_cachedNews != null && _cachedNews!.isNotEmpty) {
-      debugPrint('================ GNEWS CACHE HIT ================');
-      debugPrint('Total Berita (Cache): ${_cachedNews!.length}');
-      debugPrint('==================================================');
+      if (kDebugMode) {
+        debugPrint('[News] Cache hit: ${_cachedNews!.length} artikel');
+      }
       return _cachedNews!;
     }
 
     // Audit: Verifikasi API Key
     final String apiKey = dotenv.env['GNEWS_API_KEY'] ?? '';
-    final bool keyLoaded = apiKey.isNotEmpty;
-    debugPrint('================ GNEWS API KEY CHECK ================');
-    debugPrint('GNEWS_API_KEY Loaded: ${keyLoaded ? "Yes" : "No"}');
-    if (!keyLoaded) {
-      debugPrint('ERROR: GNEWS_API_KEY kosong atau tidak terbaca dari .env');
-      debugPrint('======================================================');
+    if (apiKey.isEmpty) {
+      debugPrint('[News] GNEWS_API_KEY kosong atau tidak terbaca dari .env');
       return [];
     }
-    debugPrint('======================================================');
 
     const String query =
         'videogame OR "video game" OR gaming OR esports OR "game release" OR '
@@ -48,57 +43,21 @@ class NewsService {
     // Audit: Log Request
     // Tampilkan URL tanpa API key agar aman di log
     final String safeUrl = uri.toString().replaceAll(apiKey, '***HIDDEN***');
-    debugPrint('================ GNEWS REQUEST ================');
-    debugPrint('Request URL: $safeUrl');
-    debugPrint(
-      'Query Params: q=$query | lang=en | max=10 | apikey=***HIDDEN***',
-    );
-    debugPrint('================================================');
+    if (kDebugMode) {
+      debugPrint('[News] Meminta berita: $safeUrl');
+    }
 
     try {
       final http.Response response = await http
           .get(uri)
           .timeout(const Duration(seconds: 15));
 
-      // Audit: Log Response
-      debugPrint('================ GNEWS RESPONSE ================');
-      debugPrint('Status Code: ${response.statusCode}');
-
-      switch (response.statusCode) {
-        case 200:
-          debugPrint('Respons Diterima: Ya');
-          break;
-        case 401:
-          debugPrint(
-            'Respons Diterima: Ya — 401 Unauthorized (API key tidak valid)',
-          );
-          debugPrint('Body: ${response.body}');
-          debugPrint('=================================================');
-          return [];
-        case 403:
-          debugPrint('Respons Diterima: Ya — 403 Forbidden (akses ditolak)');
-          debugPrint('Body: ${response.body}');
-          debugPrint('=================================================');
-          return [];
-        case 429:
-          debugPrint(
-            'Respons Diterima: Ya — 429 Too Many Requests (kuota habis)',
-          );
-          debugPrint('Body: ${response.body}');
-          debugPrint('=================================================');
-          return [];
-        case 500:
-          debugPrint('Respons Diterima: Ya — 500 Internal Server Error');
-          debugPrint('Body: ${response.body}');
-          debugPrint('=================================================');
-          return [];
-        default:
-          debugPrint(
-            'Respons Diterima: Ya — HTTP ${response.statusCode} (tidak dikenal)',
-          );
-          debugPrint('Body: ${response.body}');
-          debugPrint('=================================================');
-          return [];
+      if (response.statusCode != 200) {
+        debugPrint('[News] Gagal mengambil berita: HTTP ${response.statusCode} - ${response.reasonPhrase}');
+        if (kDebugMode) {
+          debugPrint('[News] Response body: ${response.body}');
+        }
+        return [];
       }
 
       // Audit: Parsing
@@ -106,27 +65,16 @@ class NewsService {
       try {
         data = jsonDecode(response.body) as Map<String, dynamic>;
       } catch (parseError) {
-        debugPrint('Parsing Berhasil: Tidak');
-        debugPrint('JSON decode error: $parseError');
-        debugPrint(
-          'Raw body (200 karakter pertama): ${response.body.substring(0, response.body.length.clamp(0, 200))}',
-        );
-        debugPrint('=================================================');
+        debugPrint('[News] Gagal decode JSON: $parseError');
         return [];
       }
 
       final List<dynamic>? articles = data['articles'] as List<dynamic>?;
 
       if (articles == null) {
-        debugPrint(
-          'Parsing Berhasil: Tidak — field "articles" null atau tidak ada',
-        );
-        debugPrint('Keys tersedia di response: ${data.keys.toList()}');
-        debugPrint('=================================================');
+        debugPrint('[News] Field "articles" null atau tidak ditemukan');
         return [];
       }
-
-      debugPrint('=================================================');
 
       // Parsing tiap artikel
       final List<NewsModel> allNews = [];
@@ -136,13 +84,10 @@ class NewsService {
           final NewsModel model = NewsModel.fromJson(article);
           allNews.add(model);
         } catch (itemError) {
-          debugPrint('Parsing artikel[$i] gagal: $itemError');
+          debugPrint('[News] Gagal parsing artikel[$i]: $itemError');
           // Lewati artikel rusak, lanjutkan parsing sisanya
         }
       }
-
-      debugPrint('Parsing Berhasil: Ya');
-      debugPrint('GNews Artikel Diterima: ${allNews.length} artikel.');
 
       // Post-filtering: hanya berita gaming murni
       final List<String> includeKeywords = [
@@ -228,33 +173,16 @@ class NewsService {
       if (finalNewsList.isNotEmpty) {
         _cachedNews = finalNewsList;
       }
-      debugPrint('================ GNEWS FILTER SUCCESS ================');
-      debugPrint('Total Raw Received       : ${allNews.length}');
-      debugPrint(
-        'Non-Gaming Filtered Out  : ${allNews.length - filteredNews.length}',
-      );
-      debugPrint('Final Gaming News Count  : ${finalNewsList.length}');
-      debugPrint(
-        'Cache Diperbarui         : ${finalNewsList.isNotEmpty ? "Ya" : "Tidak (list kosong, tidak di-cache)"}',
-      );
-      debugPrint('======================================================');
 
       return finalNewsList;
     } on TimeoutException catch (e) {
-      debugPrint('================ GNEWS TIMEOUT ================');
-      debugPrint('Request timed out (>15 detik): $e');
-      debugPrint('Respons Diterima: Tidak');
-      debugPrint('Parsing Berhasil: Tidak');
-      debugPrint('================================================');
+      debugPrint('[News] Request timed out: $e');
       return [];
     } catch (e, stackTrace) {
-      // Log lengkap — jangan silent catch
-      debugPrint('================ GNEWS EXCEPTION ================');
-      debugPrint('Exception: $e');
-      debugPrint('StackTrace: $stackTrace');
-      debugPrint('Respons Diterima: Tidak');
-      debugPrint('Parsing Berhasil: Tidak');
-      debugPrint('==================================================');
+      debugPrint('[News] Error tidak terduga: $e');
+      if (kDebugMode) {
+        debugPrint('[News] StackTrace: $stackTrace');
+      }
       return [];
     }
   }

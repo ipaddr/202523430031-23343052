@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../services/firestore_service.dart';
-import '../../widgets/background.dart';
+import '../../widgets/common/background.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
 import 'package:gamezone/utils/helpers.dart';
+import 'package:gamezone/styles/app_colors.dart';
 
 /// Halaman Detail Pengguna & Game Station untuk Super Admin.
 /// Jika [isUser] = false (station), halaman ini juga menangani aksi
@@ -74,7 +75,7 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: Color(0xFFEF4444),
+          backgroundColor: AppColors.errorRed,
           content: Text('Gagal menyetujui stasiun game. Coba lagi.'),
         ),
       );
@@ -92,7 +93,7 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: const Color(0xFFEF4444),
+          backgroundColor: AppColors.errorRed,
           content: Row(
             children: [
               const Icon(Icons.cancel_rounded, color: Colors.white),
@@ -111,7 +112,7 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: Color(0xFFEF4444),
+          backgroundColor: AppColors.errorRed,
           content: Text('Gagal menolak stasiun game.'),
         ),
       );
@@ -120,7 +121,6 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Detail page memilih tampilan user atau station berdasarkan flag input.
     return widget.isUser
         ? _buildUserDetailPageContent()
         : _buildStationDetailPageContent();
@@ -292,7 +292,7 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                                             isBanned ? 'BANNED' : 'AKTIF',
                                             style: TextStyle(
                                               color: isBanned
-                                                  ? const Color(0xFFEF4444)
+                                                  ? AppColors.errorRed
                                                   : const Color(0xFF10B981),
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
@@ -369,7 +369,6 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
   }
 
   Widget _buildStationDetailPageContent() {
-    // Bagian ini menampilkan detail game station beserta dokumennya.
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: GameZoneBackground(
@@ -500,7 +499,7 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
               statusTextColor = const Color(0xFF22D3EE);
             } else if (verifyStatus == 'rejected') {
               statusText = 'DITOLAK';
-              statusTextColor = const Color(0xFFEF4444);
+              statusTextColor = AppColors.errorRed;
             }
             final Color statusBgColor = statusTextColor.withValues(alpha: 0.1);
 
@@ -865,9 +864,7 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                                                             const Icon(
                                                               Icons
                                                                   .picture_as_pdf_rounded,
-                                                              color: Color(
-                                                                0xFFEF4444,
-                                                              ),
+                                                              color: AppColors.errorRed,
                                                               size: 24,
                                                             ),
                                                             const SizedBox(
@@ -1059,7 +1056,7 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
                               child: const Text(
                                 'Tolak',
                                 style: TextStyle(
-                                  color: Color(0xFFEF4444),
+                                  color: AppColors.errorRed,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 15,
                                   letterSpacing: 0.5,
@@ -1080,7 +1077,6 @@ class _UsersDetailPageState extends State<UsersDetailPage> {
   }
 
   Widget _buildDetailField(String label, String value, {bool isCyan = false}) {
-    // Field detail dipakai ulang untuk label dan nilai informasi.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

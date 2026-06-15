@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
+
+
+export 'package:gamezone/utils/helpers.dart' show bookingStatusColor, bookingStatusLabel;
 
 /// Badge status kecil — digunakan di seluruh halaman User, Admin, SuperAdmin.
 ///
@@ -41,40 +43,3 @@ class StatusBadge extends StatelessWidget {
   }
 }
 
-/// Mengembalikan warna untuk status booking secara konsisten di seluruh app.
-Color bookingStatusColor(String status) {
-  switch (status.toLowerCase()) {
-    case 'confirmed':
-    case 'checkin':
-    case 'pending_confirmation':
-      return AppColors.accentCyan;
-    case 'pending':
-      return AppColors.warningOrange;
-    case 'completed':
-      return AppColors.successGreen;
-    case 'cancelled':
-      return AppColors.errorRed;
-    default:
-      return AppColors.softGray;
-  }
-}
-
-/// Mengembalikan label Bahasa Indonesia untuk status booking.
-String bookingStatusLabel(String status) {
-  switch (status.toLowerCase()) {
-    case 'confirmed':
-      return 'DIKONFIRMASI';
-    case 'pending_confirmation':
-      return 'MENUNGGU KONFIRMASI';
-    case 'pending':
-      return 'MENUNGGU PEMBAYARAN';
-    case 'checkin':
-      return 'SEDANG BERMAIN';
-    case 'completed':
-      return 'SELESAI';
-    case 'cancelled':
-      return 'DIBATALKAN';
-    default:
-      return status.toUpperCase();
-  }
-}

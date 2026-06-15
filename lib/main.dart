@@ -16,7 +16,7 @@ import 'package:gamezone/pages/admin/room_form_page.dart';
 import 'package:gamezone/pages/admin/room_page.dart';
 import 'package:gamezone/pages/admin/booking_detail_page.dart';
 import 'package:gamezone/pages/superadmin/superadmin_dashboard.dart';
-import 'package:gamezone/pages/edit_profile_page.dart';
+import 'package:gamezone/pages/shared/edit_profile_page.dart';
 import 'package:gamezone/pages/shared/station_detail_page.dart';
 import 'package:gamezone/pages/shared/room_detail_page.dart'
     show SharedRoomDetailPage;
@@ -39,7 +39,7 @@ const SystemUiOverlayStyle _gameZoneSystemUiStyle = SystemUiOverlayStyle(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables (.env)
+  // Memuat variabel environment (.env)
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {

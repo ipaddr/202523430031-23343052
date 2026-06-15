@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../styles/gradients.dart';
+import '../../styles/gradients.dart';
 
 // Komponen autentikasi yang dipakai ulang di login dan register.
 class AuthRoleSwitch extends StatelessWidget {
@@ -31,7 +31,7 @@ class AuthRoleSwitch extends StatelessWidget {
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  gradient: isAdminMode ? null : Gradients.accent,
+                  gradient: isAdminMode ? null : Gradients.kAccent,
                   color: isAdminMode ? Colors.transparent : null,
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -54,7 +54,7 @@ class AuthRoleSwitch extends StatelessWidget {
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  gradient: isAdminMode ? Gradients.accent : null,
+                  gradient: isAdminMode ? Gradients.kAccent : null,
                   color: isAdminMode ? null : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),

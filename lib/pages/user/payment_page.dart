@@ -6,8 +6,10 @@ import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/styles/gradients.dart';
-import 'package:gamezone/widgets/background.dart';
+import 'package:gamezone/widgets/common/background.dart';
 import 'package:gamezone/widgets/common/status_badge.dart';
+import 'package:gamezone/utils/helpers.dart';
+import 'package:gamezone/widgets/common/page_header.dart';
 
 class PaymentPage extends StatefulWidget {
   const PaymentPage({super.key});
@@ -77,15 +79,7 @@ class _PaymentPageState extends State<PaymentPage> {
     super.dispose();
   }
 
-  /// Hitung sisa waktu pembayaran.
-  ///
-  /// Prioritas sumber waktu:
-  ///   1. createdAtMillis dari arguments route (tersedia saat baru booking)
-  ///   2. Fetch field createdAt dari Firestore (tersedia saat buka dari riwayat)
-  ///   3. Fallback 15 menit penuh (booking lama tanpa field createdAt)
-  ///
-  /// expiredAt = createdAt + 15 menit
-  /// remainingSeconds = max(0, expiredAt - now)
+  // Hitung sisa waktu pembayaran.
   void _initCountdown() {
     final int? createdAtMillis = _bookingData['createdAtMillis'] as int?;
 
@@ -93,7 +87,7 @@ class _PaymentPageState extends State<PaymentPage> {
       // Sumber 1: tersedia langsung dari arguments
       _applyCreatedAt(createdAtMillis);
     } else {
-      // Sumber 2: fetch dari Firestore lalu mulai timer
+      // Sumber 2: ambil dari Firestore lalu mulai hitung mundur
       final String bookingId = _bookingData['bookingId']?.toString() ?? '';
       if (bookingId.isNotEmpty) {
         _fetchCreatedAtAndStart(bookingId);
@@ -104,8 +98,8 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
-  /// Fetch createdAt dari Firestore untuk bookingId yang diberikan,
-  /// lalu inisialisasi countdown sesuai sisa waktu.
+  /// Ambil data createdAt dari Firestore untuk bookingId yang diberikan,
+  /// lalu inisialisasi hitung mundur sesuai sisa waktu.
   Future<void> _fetchCreatedAtAndStart(String bookingId) async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -118,12 +112,12 @@ class _PaymentPageState extends State<PaymentPage> {
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
 
-        // Cek apakah booking sudah dibayar / expired di Firestore
+        // Periksa apakah booking sudah dibayar / kedaluwarsa di Firestore
         final String statusBayar = (data['statusPembayaran'] ?? '')
             .toString()
             .toLowerCase();
         if (statusBayar == 'paid') {
-          // Sudah dibayar dari device lain atau session sebelumnya
+          // Sudah dibayar dari perangkat lain atau sesi sebelumnya
           if (!mounted) return;
           Navigator.pushNamedAndRemoveUntil(
             context,
@@ -148,14 +142,16 @@ class _PaymentPageState extends State<PaymentPage> {
         }
       }
     } catch (e) {
-      debugPrint('PaymentPage: gagal fetch createdAt — $e');
+      debugPrint(
+        '[Payment] Gagal mengambil data waktu pembuatan (createdAt): $e',
+      );
     }
 
-    // Fallback jika fetch gagal atau createdAt tidak ada
+    // Fallback jika pengambilan gagal atau createdAt tidak ada
     if (mounted) _startTimer();
   }
 
-  /// Hitung remaining dari createdAtMillis dan mulai timer.
+  // Hitung sisa waktu dari createdAtMillis dan mulai hitung mundur.
   void _applyCreatedAt(int createdAtMillis) {
     final DateTime createdAt = DateTime.fromMillisecondsSinceEpoch(
       createdAtMillis,
@@ -200,7 +196,7 @@ class _PaymentPageState extends State<PaymentPage> {
     });
   }
 
-  /// Tandai booking sebagai expired + cancelled di Firestore.
+  /// Tandai booking sebagai kedaluwarsa + dibatalkan di Firestore.
   /// Guard _hasTriggeredExpiry memastikan ini hanya dipanggil sekali
   /// meskipun halaman dibuka ulang beberapa kali setelah waktu habis.
   void _triggerExpiry() {
@@ -219,10 +215,7 @@ class _PaymentPageState extends State<PaymentPage> {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  String _formatCurrency(int value) {
-    if (value <= 0) return 'Rp 0';
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-  }
+  String _formatCurrency(int value) => formatCurrency(value);
 
   Future<void> _handlePayment() async {
     final String bookingId = _bookingData['bookingId'] ?? '';
@@ -231,7 +224,7 @@ class _PaymentPageState extends State<PaymentPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Kirim metode yang dipilih user ke service
+      // Kirim metode yang dipilih pengguna ke layanan
       await _paymentService.simulatePayment(
         bookingId,
         metodePembayaran: _selectedMethodId,
@@ -245,7 +238,7 @@ class _PaymentPageState extends State<PaymentPage> {
         ),
       );
 
-      // Redirect ke Riwayat Booking (tab index 3 di UserDashboardPage)
+      // Alihkan ke Riwayat Booking (tab index 3 di UserDashboardPage)
       Navigator.pushNamedAndRemoveUntil(
         context,
         '/user-dashboard',
@@ -368,43 +361,8 @@ class _PaymentPageState extends State<PaymentPage> {
   // Header
 
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      child: Row(
-        children: [
-          InkWell(
-            onTap: () => Navigator.pop(context),
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF141B31),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF23304C)),
-              ),
-              child: const Icon(
-                Icons.chevron_left_rounded,
-                color: AppColors.white,
-                size: 20,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            'Pembayaran',
-            style: AppTextStyle.h4.copyWith(
-              color: AppColors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-            ),
-          ),
-        ],
-      ),
-    );
+    return const PageHeader(title: 'Pembayaran');
   }
-
-  // Status Badge
 
   Widget _buildStatusBadge() {
     final Color badgeColor = _isExpired
@@ -418,8 +376,6 @@ class _PaymentPageState extends State<PaymentPage> {
       child: StatusBadge(label: textLabel, color: badgeColor),
     );
   }
-
-  // Total Card
 
   Widget _buildTotalCard(int totalHarga, String bookingId) {
     return Container(
@@ -465,8 +421,6 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // QRIS Card
-
   Widget _buildQrisCard() {
     return Container(
       width: double.infinity,
@@ -487,7 +441,7 @@ class _PaymentPageState extends State<PaymentPage> {
             style: AppTextStyle.body3.copyWith(color: AppColors.softGray),
           ),
           const SizedBox(height: 20),
-          // QR code area — white background agar QR terbaca scanner
+          // Area kode QR — latar belakang putih agar QR terbaca pemindai
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -513,7 +467,7 @@ class _PaymentPageState extends State<PaymentPage> {
             ),
           ),
           const SizedBox(height: 20),
-          // Countdown / expired label
+          // Label hitung mundur / kedaluwarsa
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: AppTheme.paddingL,
@@ -545,8 +499,6 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
     );
   }
-
-  // Payment Methods
 
   Widget _buildPaymentMethods() {
     return Column(
@@ -629,7 +581,7 @@ class _PaymentPageState extends State<PaymentPage> {
               ),
             ),
 
-            // Radio indicator
+            // Indikator radio
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               width: 20,
@@ -657,8 +609,6 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
     );
   }
-
-  // Bottom Bar
 
   Widget _buildBottomBar() {
     return Container(
@@ -726,7 +676,7 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 }
 
-// Data class untuk tiap pilihan metode pembayaran
+// Kelas data untuk tiap pilihan metode pembayaran
 class _PaymentMethod {
   final String id;
   final String label;
@@ -738,4 +688,3 @@ class _PaymentMethod {
     required this.icon,
   });
 }
-

@@ -3,6 +3,8 @@ import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
 import 'package:gamezone/widgets/common/custom_image_loader.dart';
+import 'package:gamezone/utils/helpers.dart';
+
 
 class UnitCard extends StatelessWidget {
   final String stationId;
@@ -22,7 +24,7 @@ class UnitCard extends StatelessWidget {
     this.onDelete,
   });
 
-  // Uses shared `readFirstString` from widgets/utils.dart.
+  // Menggunakan readFirstString bersama dari utils/helpers.dart.
 
   String? _unitImage(Map<String, dynamic> data) {
     final String? direct = data['foto']?.toString();
@@ -46,28 +48,12 @@ class UnitCard extends StatelessWidget {
     return Icons.devices_other_rounded;
   }
 
-  Color _statusColor(String status) {
-    final String lower = status.trim().toLowerCase();
-    if (lower == 'digunakan') return AppColors.errorRed;
-    if (lower == 'tersedia') return AppColors.successGreen;
-    if (lower == 'perawatan') return AppColors.warningOrange;
-    if (lower == 'tidak_aktif' || lower == 'tidak_tersedia' || lower == 'inactive') return AppColors.softGray;
-    return AppColors.lightText;
-  }
+  Color _statusColor(String status) => unitStatusColor(status);
 
-  String _statusLabel(String status) {
-    final String lower = status.trim().toLowerCase();
-    if (lower == 'digunakan') return 'Digunakan';
-    if (lower == 'tersedia') return 'Tersedia';
-    if (lower == 'perawatan') return 'Perawatan';
-    if (lower == 'tidak_aktif' || lower == 'tidak_tersedia' || lower == 'inactive') return 'Tidak Tersedia';
-    return status.isEmpty ? 'Unknown' : status;
-  }
+  String _statusLabel(String status) => unitStatusLabel(status);
 
-  String _formatCurrency(int value) {
-    if (value <= 0) return '-';
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match match) => '${match[1]}.')}';
-  }
+  String _formatCurrency(int value) => formatCurrencyWithDash(value);
+
 
   @override
   Widget build(BuildContext context) {

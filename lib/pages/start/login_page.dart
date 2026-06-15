@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/auth_service.dart';
@@ -8,8 +9,8 @@ import '../../services/firestore_service.dart';
 import '../../styles/app_colors.dart';
 import '../../styles/app_textstyle.dart';
 import '../../styles/gradients.dart';
-import '../../widgets/background.dart';
-import '../../widgets/auth_widgets.dart';
+import '../../widgets/common/background.dart';
+import '../../widgets/common/auth_widgets.dart';
 
 // Halaman masuk untuk semua jenis akun di aplikasi GameZone.
 class LoginPage extends StatefulWidget {
@@ -59,7 +60,7 @@ class _LoginPageState extends State<LoginPage> {
       try {
         methods = await _authService.fetchSignInMethodsForEmail(email);
       } catch (e) {
-        debugPrint('Error fetchSignInMethodsForEmail: $e');
+        debugPrint('[Login] Gagal fetchSignInMethodsForEmail: $e');
       }
 
       if (methods.contains('google.com') && !methods.contains('password')) {
@@ -132,7 +133,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) {
         return;
       }
-      debugPrint('Login error (non-Firebase): $e');
+      debugPrint('[Login] Error masuk (non-Firebase): $e');
       setState(() {
         _errorMessage = 'Terjadi kesalahan. Coba lagi nanti.';
       });
@@ -234,22 +235,28 @@ class _LoginPageState extends State<LoginPage> {
       final user = userCred.user;
 
       if (user != null) {
-        debugPrint(
-          "DATA PROVIDER SEBELUM LINKING: ${user.providerData.map((p) => p.providerId).toList()}",
-        );
+        if (kDebugMode) {
+          debugPrint(
+            "[Login] Data provider sebelum linking: ${user.providerData.map((p) => p.providerId).toList()}",
+          );
+        }
         await _authService.linkPasswordToCurrentUser(
           email: email,
           password: password,
         );
-        debugPrint(
-          "DATA PROVIDER SETELAH LINKING: ${user.providerData.map((p) => p.providerId).toList()}",
-        );
-        debugPrint('Password provider berhasil dihubungkan ke akun Google');
+        if (kDebugMode) {
+          debugPrint(
+            "[Login] Data provider setelah linking: ${user.providerData.map((p) => p.providerId).toList()}",
+          );
+          debugPrint('[Login] Password provider berhasil dihubungkan ke akun Google');
+        }
 
         final providers = user.providerData.map((p) => p.providerId).toList();
-        debugPrint(
-          "PROVIDER AKTIF (setelah linking Kasus 3): ${providers.join(', ')}",
-        );
+        if (kDebugMode) {
+          debugPrint(
+            "[Login] Provider aktif (setelah linking): ${providers.join(', ')}",
+          );
+        }
 
         var userData = await _firestoreService.getUserData(user.uid);
         if (userData == null) {
@@ -267,7 +274,7 @@ class _LoginPageState extends State<LoginPage> {
         await _navigateToDashboard(user, userData);
       }
     } catch (e) {
-      debugPrint('Error linking Google to Email/Password: $e');
+      debugPrint('[Login] Gagal linking Google ke Email/Password: $e');
       setState(() {
         _errorMessage = 'Gagal menghubungkan kata sandi: $e';
         _isLoading = false;
@@ -355,24 +362,27 @@ class _LoginPageState extends State<LoginPage> {
       final OAuthCredential googleCredential = await _authService
           .buildGoogleCredential(googleUser);
 
-      debugPrint('── Google Login ─────────────────────────────');
-      debugPrint('  email : $googleEmail');
+      if (kDebugMode) {
+        debugPrint('[Login] Memulai masuk Google: $googleEmail');
+      }
 
       // Cek apakah email sudah punya password provider tapi Google belum terhubung
       List<String> methods = [];
       try {
         methods = await _authService.fetchSignInMethodsForEmail(googleEmail);
       } catch (e) {
-        debugPrint('  [auth] error fetching methods: $e');
+        debugPrint('[Login] Gagal fetching methods: $e');
       }
 
       final bool hasExistingPassword = methods.contains('password');
       final bool hasGoogle = methods.contains('google.com');
 
       if (hasExistingPassword && !hasGoogle) {
-        debugPrint(
-          '  [auth] Akun email/password ada tapi Google belum terhubung. Melakukan linking...',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[Login] Akun email/password ada tapi Google belum terhubung. Melakukan linking...',
+          );
+        }
         await _performEmailPasswordLinkFlow(
           googleEmail,
           googleCredential,
@@ -390,7 +400,9 @@ class _LoginPageState extends State<LoginPage> {
       } on FirebaseAuthException catch (e) {
         if (e.code == 'account-exists-with-different-credential') {
           // KASUS C: Firebase mencegah pembuatan akun duplikat.
-          debugPrint('  [auth] account-exists → perlu linking');
+          if (kDebugMode) {
+            debugPrint('[Login] Akun sudah ada, perlu linking');
+          }
           await _performEmailPasswordLinkFlow(
             googleEmail,
             googleCredential,
@@ -409,10 +421,11 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
 
-      debugPrint(
-        '  isNewUser : ${googleSignInResult.additionalUserInfo?.isNewUser}',
-      );
-      debugPrint('  uid       : ${newUser.uid}');
+      if (kDebugMode) {
+        debugPrint(
+          '[Login] Google sign in result - isNewUser: ${googleSignInResult.additionalUserInfo?.isNewUser}, uid: ${newUser.uid}',
+        );
+      }
 
       // Periksa metode sign-in email ini untuk membedakan Kasus 1 vs Kasus 2
       final bool isNewUser =
@@ -420,13 +433,15 @@ class _LoginPageState extends State<LoginPage> {
 
       // Langkah 2: Deteksi apakah Firebase baru buat akun dan password exists (KASUS B/Kasus 2)
       if (isNewUser && hasExistingPassword) {
-        debugPrint(
-          '  [auth] isNewUser=true dan ada password account → hapus akun Google baru, perlu linking',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[Login] isNewUser=true dan ada password account. Hapus akun Google baru, perlu linking.',
+          );
+        }
         try {
           await newUser.delete();
         } catch (deleteErr) {
-          debugPrint('  [auth] gagal hapus akun baru: $deleteErr');
+          debugPrint('[Login] Gagal menghapus akun Google baru: $deleteErr');
         }
         await _authService.signOut();
 
@@ -445,7 +460,7 @@ class _LoginPageState extends State<LoginPage> {
           try {
             await newUser.delete();
           } catch (deleteErr) {
-            debugPrint('  [auth] gagal hapus akun baru: $deleteErr');
+            debugPrint('[Login] Gagal menghapus akun Google baru: $deleteErr');
           }
         }
         await _authService.signOut();
@@ -458,18 +473,19 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       final providers = newUser.providerData.map((p) => p.providerId).toList();
-      debugPrint(
-        "PROVIDER AKTIF (Google Login berhasil): ${providers.join(', ')}",
-      );
-
-      debugPrint('  [firestore] OK — role: ${userData['role']}');
+      if (kDebugMode) {
+        debugPrint(
+          "[Login] Provider aktif (Google Login berhasil): ${providers.join(', ')}",
+        );
+        debugPrint('[Login] Data Firestore OK - role: ${userData['role']}');
+      }
       await _navigateToDashboard(newUser, userData);
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       setState(() => _errorMessage = _mapFirebaseError(error.code));
     } catch (e) {
       if (!mounted) return;
-      debugPrint('  [Google login error] $e');
+      debugPrint('[Login] Error login Google: $e');
       setState(() => _errorMessage = 'Gagal login dengan Google. Coba lagi.');
     } finally {
       if (mounted && !_isRedirecting) setState(() => _isLoading = false);
@@ -805,17 +821,17 @@ class _PasswordLinkingDialogState extends State<_PasswordLinkingDialog> {
       // 2. Jika password benar, lakukan linkWithCredential
       await widget.authService.linkGoogleToCurrentUser(widget.googleCredential);
 
-      // Reload user to sync providers
+      // Muat ulang pengguna untuk sinkronisasi provider
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
         await currentUser.reload();
       }
 
       if (!mounted) return;
-      // Close the password dialog
+      // Tutup dialog kata sandi
       Navigator.of(context).pop();
 
-      // Retrieve user data and invoke onSuccess
+      // Ambil data pengguna dan jalankan onSuccess
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         var userData = await widget.firestoreService.getUserData(user.uid);
