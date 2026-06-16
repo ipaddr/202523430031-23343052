@@ -37,6 +37,14 @@ class PaymentService {
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
+        if (data['statusPembayaran']?.toString().toLowerCase() == 'paid') {
+          if (kDebugMode) {
+            debugPrint(
+              '[Payment] Booking $bookingId sudah lunas (paid). Mengabaikan update pembayaran.',
+            );
+          }
+          return;
+        }
         stationId = data['stationId']?.toString() ?? '';
         totalHarga = (data['totalHarga'] is num)
             ? (data['totalHarga'] as num).toInt()
@@ -57,6 +65,15 @@ class PaymentService {
         final DocumentReference bookingRef = _firestore
             .collection('bookings')
             .doc(bookingId);
+
+        final DocumentSnapshot bookingSnap = await transaction.get(bookingRef);
+        if (bookingSnap.exists) {
+          final String currentStatus = (bookingSnap.data() as Map<String, dynamic>?)?['statusPembayaran']?.toString() ?? '';
+          if (currentStatus.toLowerCase() == 'paid') {
+            // Sudah paid di-reread, batalkan
+            return;
+          }
+        }
 
         transaction.update(bookingRef, {
           'statusPembayaran': 'paid',

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:gamezone/services/payment_service.dart';
+import 'package:gamezone/services/xendit_service.dart';
 import 'package:gamezone/styles/app_colors.dart';
 import 'package:gamezone/styles/app_textstyle.dart';
 import 'package:gamezone/styles/app_theme.dart';
@@ -10,6 +12,7 @@ import 'package:gamezone/widgets/common/background.dart';
 import 'package:gamezone/widgets/common/status_badge.dart';
 import 'package:gamezone/utils/helpers.dart';
 import 'package:gamezone/widgets/common/page_header.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PaymentPage extends StatefulWidget {
   const PaymentPage({super.key});
@@ -18,8 +21,9 @@ class PaymentPage extends StatefulWidget {
   State<PaymentPage> createState() => _PaymentPageState();
 }
 
-class _PaymentPageState extends State<PaymentPage> {
+class _PaymentPageState extends State<PaymentPage> with WidgetsBindingObserver {
   final PaymentService _paymentService = PaymentService();
+  final XenditService _xenditService = XenditService();
 
   Map<String, dynamic> _bookingData = {};
   bool _isRouteInitialized = false;
@@ -30,6 +34,9 @@ class _PaymentPageState extends State<PaymentPage> {
   bool _isLoading = false;
   bool _hasTriggeredExpiry =
       false; // guard agar expireBooking hanya dipanggil sekali
+
+  String? _xenditInvoiceId;
+  String? _xenditInvoiceUrl;
 
   static const int _paymentDurationSeconds = 15 * 60; // 15 menit
 
@@ -61,6 +68,12 @@ class _PaymentPageState extends State<PaymentPage> {
   String _selectedMethodId = 'QRIS';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isRouteInitialized) {
@@ -75,8 +88,17 @@ class _PaymentPageState extends State<PaymentPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _countdownTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Cek status secara pasif saat kembali ke aplikasi dari browser
+      _checkPaymentStatusPassive();
+    }
   }
 
   // Hitung sisa waktu pembayaran.
@@ -135,6 +157,15 @@ class _PaymentPageState extends State<PaymentPage> {
           return;
         }
 
+        // Ambil data Xendit Invoice jika ada
+        _xenditInvoiceId = data['xenditInvoiceId']?.toString();
+        _xenditInvoiceUrl = data['xenditInvoiceUrl']?.toString();
+
+        // Pemicu cek pasif jika invoice sudah ada saat masuk halaman
+        if (_xenditInvoiceId != null && _xenditInvoiceId!.isNotEmpty) {
+          _checkPaymentStatusPassive();
+        }
+
         final dynamic rawCreatedAt = data['createdAt'];
         if (rawCreatedAt is Timestamp) {
           _applyCreatedAt(rawCreatedAt.toDate().millisecondsSinceEpoch);
@@ -186,6 +217,14 @@ class _PaymentPageState extends State<PaymentPage> {
         setState(() {
           _remainingSeconds--;
         });
+        
+        // Polling status secara pasif setiap 5 detik jika invoice sudah dibuat
+        if (_xenditInvoiceId != null && 
+            _xenditInvoiceId!.isNotEmpty && 
+            _remainingSeconds % 5 == 0 && 
+            !_isLoading) {
+          _checkPaymentStatusPassive();
+        }
       } else {
         timer.cancel();
         if (!_isExpired) {
@@ -224,99 +263,188 @@ class _PaymentPageState extends State<PaymentPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Kirim metode yang dipilih pengguna ke layanan
-      await _paymentService.simulatePayment(
-        bookingId,
-        metodePembayaran: _selectedMethodId,
-      );
-      if (!mounted) return;
+      if (_xenditInvoiceUrl != null && _xenditInvoiceUrl!.isNotEmpty) {
+        final Uri url = Uri.parse(_xenditInvoiceUrl!);
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+        setState(() => _isLoading = false);
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pembayaran berhasil.'),
-          backgroundColor: AppColors.successGreen,
-        ),
+      final String payerEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+      final String stationName = _bookingData['namaStation']?.toString() ?? 'Game Station';
+      final int totalHarga = _bookingData['totalHarga'] ?? 0;
+
+      final invoiceData = await _xenditService.createInvoice(
+        bookingId: bookingId,
+        amount: totalHarga,
+        payerEmail: payerEmail,
+        stationName: stationName,
       );
 
-      // Alihkan ke Riwayat Booking (tab index 3 di UserDashboardPage)
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        '/user-dashboard',
-        (route) => false,
-        arguments: {'initialTabIndex': 3},
-      );
+      if (invoiceData != null) {
+        final String invoiceId = invoiceData['invoice_id'] ?? '';
+        final String invoiceUrl = invoiceData['invoice_url'] ?? '';
+
+        await FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(bookingId)
+            .update({
+          'xenditInvoiceId': invoiceId,
+          'xenditInvoiceUrl': invoiceUrl,
+        });
+
+        setState(() {
+          _xenditInvoiceId = invoiceId;
+          _xenditInvoiceUrl = invoiceUrl;
+        });
+
+        final Uri url = Uri.parse(invoiceUrl);
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('Gagal membuat invoice Xendit.');
+      }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pembayaran gagal diproses.'),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
-      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Pembayaran gagal diproses: $e'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  void _showSimulasiDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.primaryDarkNavy,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: AppColors.accentCyan.withValues(alpha: 0.15),
-            ),
-          ),
-          title: Text(
-            'Simulasi Pembayaran',
-            style: AppTextStyle.h4.copyWith(
-              color: AppColors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(
-            'Apakah Anda ingin menyelesaikan pembayaran ini?',
-            style: AppTextStyle.body2.copyWith(color: AppColors.softGray),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'Batal',
-                style: AppTextStyle.buttonMedium.copyWith(
-                  color: AppColors.lightText,
-                ),
-              ),
-            ),
-            GestureDetector(
-              onTap: () {
-                Navigator.pop(dialogContext);
-                _handlePayment();
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.paddingL,
-                  vertical: AppTheme.paddingM,
-                ),
-                decoration: BoxDecoration(
-                  gradient: Gradients.kAccent,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-                ),
-                child: Text(
-                  'Bayar',
-                  style: AppTextStyle.buttonMedium.copyWith(
-                    color: AppColors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
+  /// Memeriksa status pembayaran secara pasif tanpa mengubah state loader utama (_isLoading)
+  Future<void> _checkPaymentStatusPassive() async {
+    if (_xenditInvoiceId == null || _xenditInvoiceId!.isEmpty || _isExpired) return;
+
+    try {
+      final String? status = await _xenditService.checkInvoiceStatus(_xenditInvoiceId!);
+      if (status == 'PAID' || status == 'SETTLED') {
+        final String bookingId = _bookingData['bookingId'] ?? '';
+        
+        await _paymentService.simulatePayment(
+          bookingId,
+          metodePembayaran: 'Xendit',
         );
-      },
-    );
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pembayaran berhasil dikonfirmasi!'),
+            backgroundColor: AppColors.successGreen,
+          ),
+        );
+
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/user-dashboard',
+          (route) => false,
+          arguments: {'initialTabIndex': 3},
+        );
+      } else if (status == 'EXPIRED') {
+        final String bookingId = _bookingData['bookingId'] ?? '';
+        await _paymentService.expireBooking(bookingId);
+        
+        if (!mounted) return;
+        setState(() {
+          _isExpired = true;
+          _remainingSeconds = 0;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invoice Xendit telah kadaluarsa.'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[Payment] Gagal cek status pasif: $e');
+    }
+  }
+
+  Future<void> _checkPaymentStatus() async {
+    if (_xenditInvoiceId == null || _xenditInvoiceId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Anda belum membuka halaman pembayaran Xendit.'),
+          backgroundColor: AppColors.warningOrange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final String? status = await _xenditService.checkInvoiceStatus(_xenditInvoiceId!);
+      if (status == 'PAID' || status == 'SETTLED') {
+        final String bookingId = _bookingData['bookingId'] ?? '';
+        
+        await _paymentService.simulatePayment(
+          bookingId,
+          metodePembayaran: 'Xendit',
+        );
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pembayaran berhasil dikonfirmasi!'),
+            backgroundColor: AppColors.successGreen,
+          ),
+        );
+
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/user-dashboard',
+          (route) => false,
+          arguments: {'initialTabIndex': 3},
+        );
+      } else if (status == 'EXPIRED') {
+        final String bookingId = _bookingData['bookingId'] ?? '';
+        await _paymentService.expireBooking(bookingId);
+        
+        if (!mounted) return;
+        setState(() {
+          _isExpired = true;
+          _remainingSeconds = 0;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invoice Xendit telah kadaluarsa.'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pembayaran belum diterima. Silakan selesaikan pembayaran Anda di Xendit.'),
+            backgroundColor: AppColors.warningOrange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memeriksa status pembayaran: $e'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -428,43 +556,24 @@ class _PaymentPageState extends State<PaymentPage> {
       decoration: AppTheme.cardDecoration,
       child: Column(
         children: [
+          const Icon(
+            Icons.security_rounded,
+            color: AppColors.accentCyan,
+            size: 44,
+          ),
+          const SizedBox(height: 12),
           Text(
-            'QRIS',
+            'Xendit Secure Checkout',
             style: AppTextStyle.h4.copyWith(
               color: AppColors.white,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
-            'Scan untuk melakukan pembayaran.',
+            'Seluruh pembayaran diproses secara aman menggunakan payment gateway Xendit.',
+            textAlign: TextAlign.center,
             style: AppTextStyle.body3.copyWith(color: AppColors.softGray),
-          ),
-          const SizedBox(height: 20),
-          // Area kode QR — latar belakang putih agar QR terbaca pemindai
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-            ),
-            child: Image.asset(
-              'assets/images/qris_dummy.png',
-              height: 200,
-              width: 200,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return SizedBox(
-                  height: 200,
-                  width: 200,
-                  child: Icon(
-                    Icons.qr_code_2_rounded,
-                    size: 120,
-                    color: Colors.black87,
-                  ),
-                );
-              },
-            ),
           ),
           const SizedBox(height: 20),
           // Label hitung mundur / kedaluwarsa
@@ -513,7 +622,7 @@ class _PaymentPageState extends State<PaymentPage> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Pilih metode pembayaran yang tersedia.',
+          'Pilih metode pembayaran yang tersedia di gerbang Xendit.',
           style: AppTextStyle.body3.copyWith(color: AppColors.softGray),
         ),
         const SizedBox(height: 12),
@@ -611,6 +720,8 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   Widget _buildBottomBar() {
+    final bool hasInvoice = _xenditInvoiceUrl != null && _xenditInvoiceUrl!.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       decoration: BoxDecoration(
@@ -624,8 +735,11 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
       child: SafeArea(
         top: false,
-        child: _isExpired || _isLoading
-            ? SizedBox(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_isLoading)
+              SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: Container(
@@ -634,43 +748,105 @@ class _PaymentPageState extends State<PaymentPage> {
                     color: const Color(0xFF334155),
                     borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                            color: AppColors.softGray,
-                            strokeWidth: 2.5,
-                          ),
-                        )
-                      : Text(
-                          'Bayar Sekarang',
-                          style: AppTextStyle.buttonLarge.copyWith(
-                            color: AppColors.softGray,
-                          ),
-                        ),
-                ),
-              )
-            : GestureDetector(
-                onTap: _showSimulasiDialog,
-                child: Container(
-                  width: double.infinity,
-                  height: 56,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    gradient: Gradients.kAccent,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-                    boxShadow: AppTheme.shadowMedium,
-                  ),
-                  child: Text(
-                    'Bayar Sekarang',
-                    style: AppTextStyle.buttonLarge.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.bold,
+                  child: const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                      color: AppColors.softGray,
+                      strokeWidth: 2.5,
                     ),
                   ),
                 ),
-              ),
+              )
+            else if (_isExpired)
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF334155),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                  ),
+                  child: Text(
+                    'Pembayaran Kadaluarsa',
+                    style: AppTextStyle.buttonLarge.copyWith(
+                      color: AppColors.softGray,
+                    ),
+                  ),
+                ),
+              )
+            else ...[
+              if (hasInvoice) ...[
+                GestureDetector(
+                  onTap: _checkPaymentStatus,
+                  child: Container(
+                    width: double.infinity,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.successGreen,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                      boxShadow: AppTheme.shadowSoft,
+                    ),
+                    child: Text(
+                      'Konfirmasi Pembayaran',
+                      style: AppTextStyle.buttonLarge.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: _handlePayment,
+                  child: Container(
+                    width: double.infinity,
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.secondaryDark.withValues(alpha: 0.78),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                      border: Border.all(
+                        color: AppColors.accentCyan.withValues(alpha: 0.35),
+                        width: 1.1,
+                      ),
+                    ),
+                    child: Text(
+                      'Buka Halaman Xendit Lagi',
+                      style: AppTextStyle.buttonLarge.copyWith(
+                        color: AppColors.accentCyan,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                GestureDetector(
+                  onTap: _handlePayment,
+                  child: Container(
+                    width: double.infinity,
+                    height: 56,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: Gradients.kAccent,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                      boxShadow: AppTheme.shadowMedium,
+                    ),
+                    child: Text(
+                      'Bayar Sekarang',
+                      style: AppTextStyle.buttonLarge.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ]
+            ],
+          ],
+        ),
       ),
     );
   }

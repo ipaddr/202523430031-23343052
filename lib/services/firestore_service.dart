@@ -381,7 +381,7 @@ class FirestoreService {
     try {
       final oldSnap = await _db.collection('bookings').doc(bookingId).get();
       if (oldSnap.exists) {
-        final oldData = oldSnap.data() as Map<String, dynamic>?;
+        final oldData = oldSnap.data();
         oldStatusPembayaran = oldData?['statusPembayaran']?.toString() ?? '';
         totalHarga = (oldData?['totalHarga'] is num)
             ? (oldData?['totalHarga'] as num).toInt()
