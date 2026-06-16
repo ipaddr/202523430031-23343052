@@ -300,11 +300,13 @@ class _RoomFormPageState extends State<RoomFormPage> {
   }
 
   String _pageTitle() {
-    return _isEditMode ? 'Edit Unit' : 'Tambah Unit';
+    final String typeStr = _isRoom ? 'Room' : 'PC';
+    return _isEditMode ? 'Edit $typeStr' : 'Tambah $typeStr';
   }
 
   String _buttonLabel() {
-    return _isEditMode ? 'Update Unit' : 'Simpan Unit';
+    final String typeStr = _isRoom ? 'Room' : 'PC';
+    return _isEditMode ? 'Update $typeStr' : 'Simpan $typeStr';
   }
 
   String _selectedTypeLabel() {
@@ -379,8 +381,8 @@ class _RoomFormPageState extends State<RoomFormPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Foto unit berhasil diunggah.'),
+        SnackBar(
+          content: Text('Foto ${_isRoom ? "room" : "PC"} berhasil diunggah.'),
           backgroundColor: AppColors.successGreen,
         ),
       );
@@ -571,7 +573,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
 
   String? _validateName(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Nama unit wajib diisi';
+      return _isRoom ? 'Nama room wajib diisi' : 'Nama PC wajib diisi';
     }
     return null;
   }
@@ -607,16 +609,17 @@ class _RoomFormPageState extends State<RoomFormPage> {
   }
 
   String? _validateSubmission() {
+    final String typeStr = _isRoom ? 'room' : 'PC';
     if (_photoUrl.trim().isEmpty) {
-      return 'Foto unit wajib diisi';
+      return 'Foto $typeStr wajib diisi';
     }
 
     if (_namaUnitController.text.trim().isEmpty) {
-      return 'Nama unit wajib diisi';
+      return 'Nama $typeStr wajib diisi';
     }
 
     if (_selectedType.trim().isEmpty) {
-      return 'Tipe unit wajib diisi';
+      return 'Tipe $typeStr wajib diisi';
     }
 
     if (_parseInt(_hargaPerJamController.text) <= 0) {
@@ -651,8 +654,8 @@ class _RoomFormPageState extends State<RoomFormPage> {
 
     if (_stationId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Station belum tersedia untuk menyimpan unit.'),
+        SnackBar(
+          content: Text('Station belum tersedia untuk menyimpan ${_isRoom ? "room" : "PC"}.'),
           backgroundColor: AppColors.errorRed,
         ),
       );
@@ -743,8 +746,8 @@ class _RoomFormPageState extends State<RoomFormPage> {
         SnackBar(
           content: Text(
             _isEditMode
-                ? 'Unit berhasil diperbarui.'
-                : 'Unit berhasil disimpan.',
+                ? '${_isRoom ? "Room" : "PC"} berhasil diperbarui.'
+                : '${_isRoom ? "Room" : "PC"} berhasil disimpan.',
           ),
           backgroundColor: AppColors.successGreen,
         ),
@@ -758,7 +761,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Gagal menyimpan unit: ${e.toString().replaceAll('Exception: ', '')}',
+            'Gagal menyimpan ${_isRoom ? "room" : "PC"}: ${e.toString().replaceAll('Exception: ', '')}',
           ),
           backgroundColor: AppColors.errorRed,
         ),
@@ -954,7 +957,9 @@ class _RoomFormPageState extends State<RoomFormPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSectionHeader(
-            _photoUrl.isEmpty ? 'Unggah Foto Unit' : 'Pilih Foto Unit',
+            _photoUrl.isEmpty
+                ? (_isRoom ? 'Unggah Foto Room' : 'Unggah Foto PC')
+                : (_isRoom ? 'Pilih Foto Room' : 'Pilih Foto PC'),
           ),
           const SizedBox(height: 16),
           GestureDetector(
@@ -1007,7 +1012,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
                                     ),
                                     const SizedBox(height: 14),
                                     Text(
-                                      'Unggah Foto Unit',
+                                      _isRoom ? 'Unggah Foto Room' : 'Unggah Foto PC',
                                       style: AppTextStyle.body1.copyWith(
                                         color: AppColors.white,
                                         fontWeight: FontWeight.w700,
@@ -1060,7 +1065,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
                                 ],
                                 Text(
                                   _photoUrl.isEmpty
-                                      ? 'Pilih Foto Unit'
+                                      ? (_isRoom ? 'Pilih Foto Room' : 'Pilih Foto PC')
                                       : 'Ganti Foto',
                                   style: AppTextStyle.buttonSmall.copyWith(
                                     color: AppColors.white,
@@ -1084,22 +1089,23 @@ class _RoomFormPageState extends State<RoomFormPage> {
 
   // Informasi unit
   Widget _buildCommonSection() {
+    final String typeStr = _isRoom ? 'Room' : 'PC';
     return _buildSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSectionHeader(
-            'Informasi Unit',
+            'Informasi $typeStr',
             subtitle:
-                'Lengkapi informasi dasar unit yang akan ditampilkan kepada pengguna saat melakukan booking.',
+                'Lengkapi informasi dasar $typeStr yang akan ditampilkan kepada pengguna saat melakukan booking.',
           ),
           const SizedBox(height: 16),
           _buildFieldGroup(
-            label: 'Nama Unit',
+            label: 'Nama $typeStr',
             child: TextFormField(
               controller: _namaUnitController,
               validator: _validateName,
-              decoration: _inputDecoration(hint: 'Nama unit'),
+              decoration: _inputDecoration(hint: _isRoom ? 'Nama room' : 'Nama PC'),
             ),
           ),
           const SizedBox(height: 12),
@@ -1120,12 +1126,12 @@ class _RoomFormPageState extends State<RoomFormPage> {
           ),
           const SizedBox(height: 12),
           _buildFieldGroup(
-            label: 'Status Unit',
+            label: 'Status $typeStr',
             child: DropdownButtonFormField<String>(
               initialValue: _selectedStatus,
               dropdownColor: AppColors.primaryDarkNavy,
               style: AppTextStyle.body1.copyWith(color: AppColors.white),
-              decoration: _inputDecoration(hint: 'Pilih Status Unit'),
+              decoration: _inputDecoration(hint: _isRoom ? 'Pilih Status Room' : 'Pilih Status PC'),
               items: const [
                 DropdownMenuItem<String>(
                   value: _statusAvailable,
@@ -1156,22 +1162,22 @@ class _RoomFormPageState extends State<RoomFormPage> {
           if (_selectedType == _jenisUnitPc && !_isEditMode) ...[
             const SizedBox(height: 12),
             _buildFieldGroup(
-              label: 'Jumlah Unit',
+              label: 'Jumlah PC',
               child: TextFormField(
                 controller: _jumlahUnitController,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Jumlah unit wajib diisi';
+                    return 'Jumlah PC wajib diisi';
                   }
                   final int? parsed = int.tryParse(value);
                   if (parsed == null || parsed <= 0) {
-                    return 'Jumlah unit minimal 1';
+                    return 'Jumlah PC minimal 1';
                   }
                   return null;
                 },
-                decoration: _inputDecoration(hint: 'Jumlah unit'),
+                decoration: _inputDecoration(hint: 'Jumlah PC'),
               ),
             ),
           ],
@@ -1559,7 +1565,7 @@ class _RoomFormPageState extends State<RoomFormPage> {
           _buildListInputSection(
             title: 'Fasilitas',
             helperText:
-                'Tambahkan fasilitas yang tersedia pada unit ini. Pilih suggestion atau ketik fasilitas sendiri.',
+                'Tambahkan fasilitas yang tersedia pada ${_isRoom ? "room" : "PC"} ini. Pilih suggestion atau ketik fasilitas sendiri.',
             items: _facilities,
             controller: _facilityInputController,
             onAdd: _addFacility,

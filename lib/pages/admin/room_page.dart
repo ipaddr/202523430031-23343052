@@ -634,7 +634,7 @@ class _RoomPageState extends State<RoomPage> {
                       sheetCtx,
                       icon: Icons.meeting_room_rounded,
                       title: 'Room',
-                      subtitle: 'Untuk VIP, Squad, VR, Console, dan room lain',
+                      subtitle: 'Untuk VIP, Private, Squad, dan Streaming',
                       onTap: () {
                         Navigator.pop(sheetCtx);
                         _openAddForm(context, stationId, unitType: 'room');
@@ -1289,8 +1289,6 @@ class _RoomPageState extends State<RoomPage> {
                                 'Private Room',
                                 'Squad Room',
                                 'Streaming Room',
-                                'PS5 Room',
-                                'VR Room',
                               ].map((String roomType) {
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8),
